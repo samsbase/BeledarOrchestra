@@ -752,12 +752,17 @@ function ns.CreateLeaderUI()
     ui.checkButton = checkButton
 
     local function ShowMode(mode)
+        state.currentViewMode = mode
+        local isLeader = ns.IsLeaderOrAssist()
         if mode == "VERSION" then
             ui.assignmentContainer:Hide()
             ui.versionContainer:Show()
             ui.btnAssign:SetEnabled(true)
             ui.btnVersion:SetEnabled(false)
-            if ui.checkButton then ui.checkButton:Show() end
+            if ui.checkButton then
+                if isLeader then ui.checkButton:Show() else ui.checkButton:Hide() end
+            end
+            if ui.addonStatusText then ui.addonStatusText:Show() end
             if ui.btnSave then ui.btnSave:Hide() end
             if ui.btnLoad then ui.btnLoad:Hide() end
             if ui.btnClear then ui.btnClear:Hide() end
@@ -769,14 +774,40 @@ function ns.CreateLeaderUI()
             ui.btnAssign:SetEnabled(false)
             ui.btnVersion:SetEnabled(true)
             if ui.checkButton then ui.checkButton:Hide() end
-            if ui.btnSave then ui.btnSave:Show() end
-            if ui.btnLoad then ui.btnLoad:Show() end
-            if ui.btnClear then ui.btnClear:Show() end
-            if ui.btnExport then ui.btnExport:Show() end
-            if ui.btnImport then ui.btnImport:Show() end
+            if ui.addonStatusText then ui.addonStatusText:Hide() end
+            if isLeader then
+                if ui.btnSave then ui.btnSave:Show() end
+                if ui.btnLoad then ui.btnLoad:Show() end
+                if ui.btnClear then ui.btnClear:Show() end
+                if ui.btnExport then ui.btnExport:Show() end
+                if ui.btnImport then ui.btnImport:Show() end
+            else
+                if ui.btnSave then ui.btnSave:Hide() end
+                if ui.btnLoad then ui.btnLoad:Hide() end
+                if ui.btnClear then ui.btnClear:Hide() end
+                if ui.btnExport then ui.btnExport:Hide() end
+                if ui.btnImport then ui.btnImport:Hide() end
+            end
             ns.UpdateAssignmentGrid()
         end
+        -- Leader-only buttons
+        if isLeader then
+            for idx = 1, MAX_MEASURES do
+                if ui.gridButtons[idx] then ui.gridButtons[idx]:SetEnabled(true) end
+            end
+            if ui.bowButton then ui.bowButton:Show() end
+            if ui.startButton then ui.startButton:Show() end
+            if ui.retryButton then ui.retryButton:Show() end
+        else
+            for idx = 1, MAX_MEASURES do
+                if ui.gridButtons[idx] then ui.gridButtons[idx]:SetEnabled(false) end
+            end
+            if ui.bowButton then ui.bowButton:Hide() end
+            if ui.startButton then ui.startButton:Hide() end
+            if ui.retryButton then ui.retryButton:Hide() end
+        end
     end
+    ns.ShowMode = ShowMode
 
     btnAssign:SetScript("OnClick", function() ShowMode("ASSIGN") end)
     btnVersion:SetScript("OnClick", function() ShowMode("VERSION") end)
@@ -1048,6 +1079,7 @@ function ns.CreateLeaderUI()
     addonStatusText:SetWidth(720)
     addonStatusText:SetJustifyH("CENTER")
     addonStatusText:SetText("")
+    addonStatusText:Hide()
     ui.addonStatusText = addonStatusText
 
     local closeButton = CreateFrame("Button", nil, main, "UIPanelCloseButton")

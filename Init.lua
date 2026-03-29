@@ -126,6 +126,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" then
         ns.UpdatePlayerPanel()
         ns.ValidateTarget()
+        if event == "GROUP_ROSTER_UPDATE" and ns.ShowMode and state.currentViewMode then
+            ns.ShowMode(state.currentViewMode)
+        end
 
     elseif event == "UNIT_AURA" then
         local unit = ...
