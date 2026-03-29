@@ -8,6 +8,8 @@ local UPDATE_INTERVAL = 0.2
 local MAX_MEASURES = 25
 local RAID_SLOTS = 40
 
+local VERSION = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "Unknown"
+
 local EMOTES = {
     CHEER = { command = "CHEER", display = "/cheer", spellId = 1266756 },
     SING = { command = "SING", display = "/sing", spellId = 1266760 },
@@ -366,7 +368,7 @@ local function SendPing()
     
     local channel = IsInRaid() and "RAID" or "PARTY"
     C_ChatInfo.SendAddonMessage(PREFIX, "PING", channel)
-    Print("Sent addon check to group...")
+    Print("Sent version check to group...")
 end
 
 local function SendPong()
@@ -375,7 +377,7 @@ local function SendPong()
     end
     
     local channel = IsInRaid() and "RAID" or "PARTY"
-    C_ChatInfo.SendAddonMessage(PREFIX, "PONG", channel)
+    C_ChatInfo.SendAddonMessage(PREFIX, "PONG:" .. VERSION, channel)
 end
 
 local function SetMeasure(measure, silent)
@@ -497,16 +499,15 @@ local function ValidateTarget()
             ui.addonStatusText:SetText(string.format("Checking addon... (%.1fs)", 5 - elapsed))
         else
             local missing = {}
+            local versions = {}
             local numMembers = GetNumGroupMembers()
+            local groupMembers = {}
             
             if IsInRaid() then
                 for i = 1, MAX_RAID_MEMBERS do
                     local name = GetRaidRosterInfo(i)
                     if name then
-                        local shortName = Ambiguate(name, "none")
-                        if not state.activePlayers[shortName] then
-                            table.insert(missing, shortName)
-                        end
+                        table.insert(groupMembers, Ambiguate(name, "none"))
                     end
                 end
             elseif IsInGroup() then
@@ -514,19 +515,42 @@ local function ValidateTarget()
                     local unit = (i == numMembers) and "player" or ("party" .. i)
                     local name = UnitFullName(unit)
                     if name then
-                        local shortName = Ambiguate(name, "none")
-                        if not state.activePlayers[shortName] then
-                            table.insert(missing, shortName)
-                        end
+                        table.insert(groupMembers, Ambiguate(name, "none"))
                     end
                 end
             end
+
+            for _, name in ipairs(groupMembers) do
+                local v = state.activePlayers[name]
+                if not v then
+                    table.insert(missing, name)
+                else
+                    versions[v] = versions[v] or {}
+                    table.insert(versions[v], name)
+                end
+            end
             
-            if #missing == 0 then
-                ui.addonStatusText:SetText("|cff00ff00All members have the addon.|r")
-            else
+            local statusLines = {}
+            if #missing > 0 then
                 table.sort(missing)
-                ui.addonStatusText:SetText("|cffff0000Missing addon:|r " .. table.concat(missing, ", "))
+                table.insert(statusLines, "|cffff0000Missing:|r " .. table.concat(missing, ", "))
+            end
+
+            local sortedVersions = {}
+            for v in pairs(versions) do table.insert(sortedVersions, v) end
+            table.sort(sortedVersions, function(a, b) return a > b end)
+
+            for _, v in ipairs(sortedVersions) do
+                local names = versions[v]
+                table.sort(names)
+                local color = (v == VERSION) and "|cff00ff00" or "|cffffff00"
+                table.insert(statusLines, color .. "v" .. v .. ":|r " .. table.concat(names, ", "))
+            end
+            
+            if #statusLines == 0 then
+                ui.addonStatusText:SetText("|cffff0000No members detected.|r")
+            else
+                ui.addonStatusText:SetText(table.concat(statusLines, " | "))
             end
         end
     end
@@ -659,7 +683,7 @@ local function CreateLeaderUI()
     local checkButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
     checkButton:SetSize(120, 36)
     checkButton:SetPoint("LEFT", bowButton, "RIGHT", 10, 0)
-    checkButton:SetText("Check Addon")
+    checkButton:SetText("Check Versions")
     checkButton:SetScript("OnClick", function()
         if not IsInGroup() then
             Print("You are not in a group.")
@@ -818,7 +842,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
             SendPong()
         elseif action == "PONG" then
             local name = Ambiguate(sender, "none")
-            state.activePlayers[name] = true
+            state.activePlayers[name] = value or "Unknown"
         end
 
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" then

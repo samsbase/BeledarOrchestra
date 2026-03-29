@@ -2,7 +2,7 @@
 ## Title: Beledar Orchestra
 ## Notes: Raid coordination helper for the Hallowfall flame puzzle.
 ## Author: OpenAI
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: BeledarOrchestraDB
 Measures.lua
 BeledarOrchestra.lua
