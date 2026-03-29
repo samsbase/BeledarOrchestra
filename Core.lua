@@ -9,6 +9,7 @@ ns.TARGET_NPC_ID = 255888
 ns.UPDATE_INTERVAL = 0.2
 ns.MAX_MEASURES = 25
 ns.RAID_SLOTS = 40
+ns.ZONE_ID = 2215
 
 ns.VERSION = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "Unknown"
 ns.ADDON_NAME = ADDON_NAME
@@ -42,12 +43,8 @@ function ns.Print(msg)
 end
 
 function ns.GetNpcID(unit)
-    local guid = UnitGUID(unit)
-    if not guid then return nil end
-    local type, _, _, _, _, npcID = strsplit("-", guid)
-    if type == "Creature" or type == "Vehicle" then
-        return tonumber(npcID)
-    end
+    local id = UnitCreatureID(unit)
+    if id then return tonumber(id) end
     return nil
 end
 

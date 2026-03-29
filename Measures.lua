@@ -56,7 +56,7 @@ ns.MEASURES = {
         [31] = "CONGRATS", [32] = "ROAR", [33] = "CONGRATS", [34] = "DANCE", [35] = "CONGRATS", [36] = "ROAR", [37] = "SING", [38] = "PLACEHOLDER", [39] = "CONGRATS", [40] = "APPLAUD"
     },
     [10] = {
-        [1] = "SING", [2] = "DANCE", [3] = "ROAR", [4] = "VIOLIN", [5] = "PLACEHOLDER", [6] = "ROAR", [7] = "CHEER", [8] = "VIOLIN", [9] = "VIOLIN", [10] = "DANCE", 
+        [1] = "SING", [2] = "DANCE", [3] = "ROAR", [4] = "VIOLIN", [5] = "DANCE", [6] = "ROAR", [7] = "CHEER", [8] = "VIOLIN", [9] = "VIOLIN", [10] = "DANCE", 
         [11] = "APPLAUD", [12] = "CHEER", [13] = "CHEER", [14] = "CHEER", [15] = "CHEER", [16] = "SING", [17] = "PLACEHOLDER", [18] = "ROAR", [19] = "CHEER", [20] = "ROAR", 
         [21] = "PLACEHOLDER", [22] = "CHEER", [23] = "CHEER", [24] = "DANCE", [25] = "CHEER", [26] = "CONGRATS", [27] = "SING", [28] = "CHEER", [29] = "SING", [30] = "VIOLIN", 
         [31] = "SING", [32] = "APPLAUD", [33] = "SING", [34] = "DANCE", [35] = "CHEER", [36] = "VIOLIN", [37] = "ROAR", [38] = "SING", [39] = "PLACEHOLDER", [40] = "APPLAUD"
@@ -99,7 +99,7 @@ ns.MEASURES = {
     },
     [17] = {
         [1] = "SING", [2] = "DANCE", [3] = "CHEER", [4] = "CHEER", [5] = "CHEER", [6] = "DANCE", [7] = "VIOLIN", [8] = "ROAR", [9] = "APPLAUD", [10] = "SING", 
-        [11] = "PLACEHOLDER", [12] = "CHEER", [13] = "PLACEHOLDER", [14] = "VIOLIN", [15] = "APPLAUD", [16] = "CONGRATS", [17] = "PLACEHOLDER", [18] = "ROAR", [19] = "DANCE", [20] = "ROAR", 
+        [11] = "PLACEHOLDER", [12] = "CHEER", [13] = "SING", [14] = "VIOLIN", [15] = "APPLAUD", [16] = "CONGRATS", [17] = "PLACEHOLDER", [18] = "ROAR", [19] = "DANCE", [20] = "ROAR", 
         [21] = "APPLAUD", [22] = "APPLAUD", [23] = "SING", [24] = "CHEER", [25] = "CHEER", [26] = "SING", [27] = "VIOLIN", [28] = "APPLAUD", [29] = "ROAR", [30] = "ROAR", 
         [31] = "CONGRATS", [32] = "CHEER", [33] = "APPLAUD", [34] = "CHEER", [35] = "VIOLIN", [36] = "ROAR", [37] = "CHEER", [38] = "CONGRATS", [39] = "CONGRATS", [40] = "DANCE"
     },

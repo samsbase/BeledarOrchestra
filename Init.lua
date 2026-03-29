@@ -6,6 +6,10 @@ local ui = ns.ui
 local PREFIX = ns.PREFIX
 local Print = ns.Print
 
+local function IsInCorrectZone()
+    return C_Map.GetBestMapForUnit("player") == ns.ZONE_ID
+end
+
 -- Slash commands
 SLASH_BELEDARORCHESTRA1 = "/conductor"
 SlashCmdList.BELEDARORCHESTRA = function(msg)
@@ -74,6 +78,17 @@ end
 
 -- Event handler
 frame:SetScript("OnEvent", function(_, event, ...)
+    if event == "ZONE_CHANGED_NEW_AREA" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
+        if IsInCorrectZone() then
+            if ui.main then ui.main:Show() end
+            if ui.playerFrame then ui.playerFrame:Show() end
+        else
+            if ui.main then ui.main:Hide() end
+            if ui.playerFrame then ui.playerFrame:Hide() end
+        end
+        return
+    end
+
     if event == "ADDON_LOADED" then
         local loadedName = ...
         if loadedName ~= ns.ADDON_NAME then return end
@@ -122,6 +137,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
         local prefix, message, _, sender = ...
         if prefix ~= PREFIX then return end
         ns.HandleAddonMessage(message, sender)
+
+    elseif InCombatLockdown() then
+        return
 
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" then
         ns.UpdatePlayerPanel()
@@ -172,6 +190,9 @@ end)
 
 -- OnUpdate timer
 frame:SetScript("OnUpdate", function(_, elapsed)
+    if InCombatLockdown() then return end
+    if not IsInCorrectZone() then return end
+
     -- Countdown tick: always check even if no UI is visible, so measureStarted
     -- is set promptly when the countdown expires (player may not be targeting NPC)
     if state.countdownEndTime and not state.measureStarted then
@@ -206,3 +227,6 @@ frame:RegisterEvent("CHAT_MSG_ADDON")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UNIT_AURA")
+frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+frame:RegisterEvent("ZONE_CHANGED")
+frame:RegisterEvent("ZONE_CHANGED_INDOORS")
