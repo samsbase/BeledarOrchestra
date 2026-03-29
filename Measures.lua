@@ -146,7 +146,7 @@ ns.MEASURES = {
         [31] = "CHEER", [32] = "CHEER", [33] = "SING", [34] = "DANCE", [35] = "ROAR", [36] = "CONGRATS", [37] = "APPLAUD", [38] = "APPLAUD", [39] = "ROAR", [40] = "CHEER"
     },
     [25] = {
-        [1] = "DANCE", [2] = "APPLAUD", [3] = "ROAR", [4] = "VIOLIN", [5] = "PLACEHOLDER", [6] = "SING", [7] = "SING", [8] = "PLACEHOLDER", [9] = "CHEER", [10] = "CONGRATS", 
+        [1] = "DANCE", [2] = "APPLAUD", [3] = "ROAR", [4] = "VIOLIN", [5] = "APPLAUD", [6] = "SING", [7] = "SING", [8] = "PLACEHOLDER", [9] = "CHEER", [10] = "CONGRATS", 
         [11] = "PLACEHOLDER", [12] = "CHEER", [13] = "APPLAUD", [14] = "APPLAUD", [15] = "CHEER", [16] = "ROAR", [17] = "ROAR", [18] = "SING", [19] = "ROAR", [20] = "DANCE", 
         [21] = "DANCE", [22] = "DANCE", [23] = "CHEER", [24] = "DANCE", [25] = "CONGRATS", [26] = "SING", [27] = "APPLAUD", [28] = "APPLAUD", [29] = "SING", [30] = "CHEER", 
         [31] = "SING", [32] = "DANCE", [33] = "DANCE", [34] = "APPLAUD", [35] = "CHEER", [36] = "SING", [37] = "DANCE", [38] = "CHEER", [39] = "VIOLIN", [40] = "SING"
