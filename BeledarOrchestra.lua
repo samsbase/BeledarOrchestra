@@ -199,8 +199,8 @@ local function EnsureMismatchWidgets()
     end
 
     local container = CreateFrame("Frame", nil, ui.main)
-    container:SetSize(400, 96)
-    container:SetPoint("BOTTOMLEFT", 20, 66)
+    container:SetSize(400, 110)
+    container:SetPoint("TOPLEFT", 20, -305)
     ui.mismatchContainer = container
 
     local title = container:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -209,15 +209,15 @@ local function EnsureMismatchWidgets()
     ui.mismatchTitle = title
 
     local row = CreateFrame("Frame", nil, container)
-    row:SetSize(260, 56)
-    row:SetPoint("TOP", container, "TOP", 0, -22)
+    row:SetSize(380, 56)
+    row:SetPoint("TOPLEFT", container, "TOPLEFT", 0, -20)
     ui.mismatchRow = row
 
     ui.mismatchWidgets = {}
 
     local maxIcons = 7
     local cellWidth = 44
-    local gap = 16
+    local gap = 10
 
     for i = 1, maxIcons do
         local cell = CreateFrame("Frame", nil, row)
@@ -397,7 +397,11 @@ end
 local function PressPlayerEmote()
     local slot = GetRaidSlotForPlayer()
     if not slot or not state.currentMeasure then
-        return
+        UpdatePlayerPanel()
+        slot = GetRaidSlotForPlayer()
+        if not slot or not state.currentMeasure then
+            return
+        end
     end
 
     local token = GetMeasureEmote(state.currentMeasure, slot)
@@ -412,8 +416,22 @@ local function PressBow()
 end
 
 local function UpdatePlayerPanel()
-    if not ui.playerFrame or not ui.playerFrame:IsShown() then
+    if not ui.playerFrame then
         return
+    end
+
+    local targetName = UnitName("target")
+    local isTargeted = (targetName == TARGET_NAME)
+
+    if not isTargeted then
+        if ui.playerFrame:IsShown() then
+            ui.playerFrame:Hide()
+        end
+        return
+    end
+
+    if not ui.playerFrame:IsShown() then
+        ui.playerFrame:Show()
     end
 
     local slot = GetRaidSlotForPlayer()
