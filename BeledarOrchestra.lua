@@ -16,7 +16,7 @@ local EMOTES = {
     DANCE = { command = "DANCE", display = "/dance", spellId = 1266758 },
     VIOLIN = { command = "VIOLIN", display = "/violin", spellId = 1266761 },
     APPLAUD = { command = "APPLAUD", display = "/applaud", spellId = 1266754 },
-    CONGRATS = { command = "CONGRATS", display = "/congrats", spellId = 1266755 },
+    CONGRATS = { command = "CONGRATULATE", display = "/congrats", spellId = 1266755 },
     ROAR = { command = "ROAR", display = "/roar", spellId = 1266759 },
     BOW = { command = "BOW", display = "/bow", spellId = nil },
     PLACEHOLDER = { command = nil, display = "?", spellId = nil },
@@ -29,7 +29,6 @@ for token, emote in pairs(EMOTES) do
     end
 end
 
-local MEASURES = ns.MEASURES
 
 local state = {
     currentMeasure = nil,
@@ -38,16 +37,29 @@ local state = {
     lastUpdate = 0,
     activePlayers = {},
     lastPingTime = 0,
+    performedEmotes = {},
+    danceMoving = {},    -- slot -> true if started moving after dance
+    danceComplete = {},  -- slot -> true if stopped moving after dance
+    measureLocked = false, -- true once any player has performed their emote
 }
 
 local frame = CreateFrame("Frame")
 local ui = {}
 
-local function Print(msg)
+-- Forward declarations for local functions to prevent "nil global" errors
+local Print, GetNpcID, IsTargetNpc, IsLeaderOrAssist, HasAura, GetMeasureEmote, IsReady
+local GetSortedRaidMembers, GetRaidSlotForPlayer, BuildExpectedCounts, BuildObservedCounts, CountsEqual
+local GetSpellNameSafe, GetSpellTextureSafe, BuildMismatchEntries, OpenEmoteDropdown, UpdateAssignmentGrid
+local CreateAssignmentGrid, CreateVersionGrid, EnsureMismatchWidgets, RenderMismatchEntries, SetStatus
+local BroadcastMeasure, SendPing, SendPong, SetMeasure, PressPlayerEmote, PressBow
+local UpdatePlayerPanel, ValidateTarget, MakeMovable, CreateBackdropFrame, CreateLeaderUI
+local ShowMode, CreatePlayerUI, RetryMeasure
+
+Print = function(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff99ccffBeledar Orchestra:|r " .. tostring(msg))
 end
 
-local function GetNpcID(unit)
+GetNpcID = function(unit)
     local guid = UnitGUID(unit)
     if not guid then return nil end
     local type, _, _, _, _, npcID = strsplit("-", guid)
@@ -57,65 +69,131 @@ local function GetNpcID(unit)
     return nil
 end
 
-local function IsTargetNpc(unit)
+IsTargetNpc = function(unit)
     return GetNpcID(unit) == TARGET_NPC_ID
 end
 
-local function IsLeaderOrAssist()
+IsLeaderOrAssist = function()
     return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
 end
 
-local function GetRaidSlotForPlayer()
-    if IsInRaid() then
-        local playerName = UnitFullName("player")
-        local members = {}
+HasAura = function(unit, spellId)
+    if not unit or not spellId then return false end
+    
+    -- Use a direct loop with C_UnitAuras.GetAuraDataByIndex for stability across versions
+    for i = 1, 255 do
+        local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
+        if not aura then break end
+        if type(aura) == "table" and aura.spellId == spellId then
+            return true
+        end
+    end
+    
+    return false
+end
 
-        for i = 1, MAX_RAID_MEMBERS do
+GetMeasureEmote = function(measure, slot)
+    if not measure or not slot then
+        return "PLACEHOLDER"
+    end
+    if BeledarOrchestraDB.Overrides and BeledarOrchestraDB.Overrides[measure] and BeledarOrchestraDB.Overrides[measure][slot] then
+        return BeledarOrchestraDB.Overrides[measure][slot]
+    end
+    if not ns.MEASURES or not ns.MEASURES[measure] then
+        return "PLACEHOLDER"
+    end
+    return ns.MEASURES[measure][slot] or "PLACEHOLDER"
+end
+
+IsReady = function(unit, slotIndex)
+    if not unit then return false end
+    if not UnitIsConnected(unit) then return false end
+    
+    -- Check for the participation aura
+    if HasAura(unit, 1266536) then return true end
+    
+    -- Fallback: check if they have any of the emote auras
+    for _, emote in pairs(EMOTES) do
+        if emote.spellId and HasAura(unit, emote.spellId) then
+            return true
+        end
+    end
+
+    -- If we have an assigned emote for the current measure, check that specifically too
+    if state.currentMeasure and slotIndex then
+        local token = GetMeasureEmote(state.currentMeasure, slotIndex)
+        local emote = EMOTES[token]
+        if emote and emote.spellId and HasAura(unit, emote.spellId) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+GetSortedRaidMembers = function()
+    local members = {}
+    if IsInRaid() then
+        for i = 1, RAID_SLOTS do
             local name, rank, subgroup = GetRaidRosterInfo(i)
             if name then
                 table.insert(members, {
-                    name = name,
+                    name = Ambiguate(name, "none"),
                     subgroup = subgroup or 9,
                     raidIndex = i,
+                    unit = "raid" .. i,
                 })
             end
         end
-
-        table.sort(members, function(a, b)
-            if a.subgroup ~= b.subgroup then
-                return a.subgroup < b.subgroup
-            end
-            return a.raidIndex < b.raidIndex
-        end)
-
-        for visualSlot, member in ipairs(members) do
-            if member.name == playerName then
-                return visualSlot
+    elseif IsInGroup() then
+        local num = GetNumGroupMembers()
+        for i = 1, num do
+            local unit = (i == num) and "player" or ("party" .. i)
+            local name, realm = UnitFullName(unit)
+            if name then
+                local fullName = name
+                if realm and realm ~= "" then
+                    fullName = name .. "-" .. realm
+                end
+                table.insert(members, {
+                    name = Ambiguate(fullName, "none"),
+                    subgroup = 1,
+                    raidIndex = i,
+                    unit = unit,
+                })
             end
         end
-    elseif IsInGroup() then
-        return 1
     end
 
+    table.sort(members, function(a, b)
+        if a.subgroup ~= b.subgroup then
+            return a.subgroup < b.subgroup
+        end
+        return a.raidIndex < b.raidIndex
+    end)
+
+    return members
+end
+
+GetRaidSlotForPlayer = function()
+    local members = GetSortedRaidMembers()
+    for visualSlot, member in ipairs(members) do
+        if member.unit and UnitIsUnit(member.unit, "player") then
+            return visualSlot
+        end
+    end
     return nil
 end
 
-local function GetMeasureEmote(measure, slot)
-    if not measure or not slot or not MEASURES[measure] then
-        return "PLACEHOLDER"
-    end
-    return MEASURES[measure][slot] or "PLACEHOLDER"
-end
-
-local function BuildExpectedCounts(measure)
+BuildExpectedCounts = function(measure)
     local expected = {}
 
-    if not measure or not MEASURES[measure] then
+    if not measure then
         return expected
     end
 
     for slot = 1, RAID_SLOTS do
-        local token = MEASURES[measure][slot]
+        local token = GetMeasureEmote(measure, slot)
         if token and token ~= "PLACEHOLDER" then
             local emote = EMOTES[token]
             if emote and emote.spellId then
@@ -127,22 +205,23 @@ local function BuildExpectedCounts(measure)
     return expected
 end
 
-local function BuildObservedCounts()
+BuildObservedCounts = function()
     local observed = {}
     local anyAura = false
 
-    AuraUtil.ForEachAura("target", "HELPFUL", nil, function(aura)
-        if aura and aura.spellId then
+    for i = 1, 255 do
+        local aura = C_UnitAuras.GetAuraDataByIndex("target", i, "HELPFUL")
+        if not aura then break end
+        if type(aura) == "table" and aura.spellId then
             anyAura = true
             observed[aura.spellId] = aura.applications or 1
         end
-        return false
-    end, true)
+    end
 
     return observed, anyAura
 end
 
-local function CountsEqual(expected, observed)
+CountsEqual = function(expected, observed)
     for spellId, expectedCount in pairs(expected) do
         if (observed[spellId] or 0) ~= expectedCount then
             return false
@@ -158,7 +237,7 @@ local function CountsEqual(expected, observed)
     return true
 end
 
-local function GetSpellNameSafe(spellId)
+GetSpellNameSafe = function(spellId)
     if C_Spell and C_Spell.GetSpellName then
         local n = C_Spell.GetSpellName(spellId)
         if n then return n end
@@ -166,7 +245,7 @@ local function GetSpellNameSafe(spellId)
     return tostring(spellId)
 end
 
-local function GetSpellTextureSafe(spellId)
+GetSpellTextureSafe = function(spellId)
     if C_Spell and C_Spell.GetSpellTexture then
         local t = C_Spell.GetSpellTexture(spellId)
         if t then return t end
@@ -174,7 +253,7 @@ local function GetSpellTextureSafe(spellId)
     return 134400
 end
 
-local function BuildMismatchEntries(expected, observed)
+BuildMismatchEntries = function(expected, observed)
     local entries = {}
 
     for spellId, expectedCount in pairs(expected) do
@@ -209,14 +288,306 @@ local function BuildMismatchEntries(expected, observed)
     return entries
 end
 
-local function EnsureMismatchWidgets()
+OpenEmoteDropdown = function(anchor, measure, slotIndex)
+    local tokens = {}
+    for token in pairs(EMOTES) do
+        table.insert(tokens, token)
+    end
+    table.sort(tokens)
+
+    if MenuUtil and MenuUtil.CreateContextMenu then
+        MenuUtil.CreateContextMenu(anchor, function(owner, rootDescription)
+            rootDescription:CreateTitle("Assign Emote for Slot " .. slotIndex)
+            for _, token in ipairs(tokens) do
+                local data = EMOTES[token]
+                rootDescription:CreateButton(data.display or token, function()
+                    if not IsLeaderOrAssist() then return end
+                    BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+                    BeledarOrchestraDB.Overrides[measure] = BeledarOrchestraDB.Overrides[measure] or {}
+                    BeledarOrchestraDB.Overrides[measure][slotIndex] = token
+                    
+                    if IsInGroup() then
+                        local channel = IsInRaid() and "RAID" or "PARTY"
+                        C_ChatInfo.SendAddonMessage(PREFIX, string.format("OVERRIDE:%d:%d:%s", measure, slotIndex, token), channel)
+                    end
+                    
+                    UpdateAssignmentGrid()
+                    UpdatePlayerPanel()
+                    ValidateTarget()
+                end)
+            end
+        end)
+    else
+        -- Fallback for legacy clients where MenuUtil might not exist
+        local menu = {
+            { text = "Assign Emote for Slot " .. slotIndex, isTitle = true, notCheckable = true },
+        }
+        for _, token in ipairs(tokens) do
+            local data = EMOTES[token]
+            table.insert(menu, {
+                text = data.display or token,
+                func = function()
+                    if not IsLeaderOrAssist() then return end
+                    BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+                    BeledarOrchestraDB.Overrides[measure] = BeledarOrchestraDB.Overrides[measure] or {}
+                    BeledarOrchestraDB.Overrides[measure][slotIndex] = token
+                    
+                    if IsInGroup() then
+                        local channel = IsInRaid() and "RAID" or "PARTY"
+                        C_ChatInfo.SendAddonMessage(PREFIX, string.format("OVERRIDE:%d:%d:%s", measure, slotIndex, token), channel)
+                    end
+                    
+                    UpdateAssignmentGrid()
+                    UpdatePlayerPanel()
+                    ValidateTarget()
+                end,
+                notCheckable = true,
+            })
+        end
+        if not ui.dropdownFrame then
+            ui.dropdownFrame = CreateFrame("Frame", "BeledarOrchestraDropdown", UIParent, "UIDropDownMenuTemplate")
+        end
+        if _G.EasyMenu then
+            _G.EasyMenu(menu, ui.dropdownFrame, anchor, 0, 0, "MENU")
+        end
+    end
+end
+
+UpdateAssignmentGrid = function(members)
+    if not ui.assignmentSlots or not ui.main or not ui.main:IsShown() then return end
+    if not state.currentMeasure then
+        for i = 1, RAID_SLOTS do ui.assignmentSlots[i]:Hide() end
+        return
+    end
+    
+    members = members or GetSortedRaidMembers()
+    for i = 1, RAID_SLOTS do
+        local slot = ui.assignmentSlots[i]
+        local member = members[i]
+        local token = GetMeasureEmote(state.currentMeasure, i)
+        local emote = EMOTES[token] or EMOTES.PLACEHOLDER
+        
+        local isOverride = BeledarOrchestraDB.Overrides and BeledarOrchestraDB.Overrides[state.currentMeasure] and BeledarOrchestraDB.Overrides[state.currentMeasure][i]
+        if isOverride then
+            slot:SetBackdropBorderColor(1, 0.82, 0, 1)
+            slot:SetBackdropColor(0.2, 0.15, 0, 0.8)
+            if slot.overrideBorder then slot.overrideBorder:Show() end
+        else
+            slot:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+            slot:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+            if slot.overrideBorder then slot.overrideBorder:Hide() end
+        end
+
+        if emote.spellId then
+            slot.icon:SetTexture(GetSpellTextureSafe(emote.spellId))
+        else
+            slot.icon:SetTexture(134400) -- Question mark
+        end
+        slot.icon:Show()
+        
+        local playerName = member and member.name or ""
+        slot.text:SetText(playerName)
+        
+        if member and member.unit then
+            local isConnected = UnitIsConnected(member.unit)
+            local isReady = IsReady(member.unit, i)
+            local hasPerformed = state.performedEmotes[i]
+            local isDanceSlot = (token == "DANCE")
+            local danceMovingSlot = state.danceMoving[i]
+            local danceCompleteSlot = state.danceComplete[i]
+            
+            if hasPerformed and isDanceSlot then
+                if danceCompleteSlot then
+                    slot.text:SetTextColor(0, 1, 0) -- Green: dance + move complete
+                elseif danceMovingSlot then
+                    slot.text:SetTextColor(1, 0.5, 0) -- Orange: moving
+                else
+                    slot.text:SetTextColor(1, 0.5, 0) -- Orange: needs to move
+                end
+            elseif hasPerformed then
+                slot.text:SetTextColor(0, 1, 0) -- Green
+            elseif state.measureLocked then
+                slot.text:SetTextColor(0.5, 0.5, 0.5) -- Grey: locked
+            elseif not isConnected or not isReady then
+                slot.text:SetTextColor(1, 0, 0) -- Red
+            else
+                slot.text:SetTextColor(1, 1, 1) -- White
+            end
+        else
+            slot.text:SetTextColor(1, 1, 1)
+        end
+        
+        slot:Show()
+    end
+end
+
+CreateAssignmentGrid = function(parent)
+    local container = CreateFrame("Frame", nil, parent)
+    container:SetSize(706, 126)
+    container:SetPoint("TOPLEFT", parent, "TOPLEFT", 30, -470)
+    ui.assignmentContainer = container
+
+    local title = container:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 0, 2)
+    title:SetText("Assigned Emotes")
+    ui.assignmentTitle = title
+
+    ui.assignmentSlots = {}
+    local boxW, boxH = 70, 22
+    local gapW, gapH = 20, 4
+
+    for i = 1, RAID_SLOTS do
+        local slot = CreateFrame("Frame", nil, container, "BackdropTemplate")
+        slot:SetSize(boxW, boxH)
+        
+        local col = math.floor((i - 1) / 5)
+        local row = (i - 1) % 5
+        slot:SetPoint("TOPLEFT", col * (boxW + gapW), -row * (boxH + gapH))
+        
+        local slotNum = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        slotNum:SetText(i)
+        slotNum:SetTextColor(0.7, 0.7, 0.7)
+        slotNum:SetPoint("RIGHT", slot, "LEFT", -2, 0)
+        slot.slotNum = slotNum
+        
+        slot:SetBackdrop({
+            bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            tile = true, tileSize = 8, edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 }
+        })
+        slot:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+        slot:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+        local overrideBorder = CreateFrame("Frame", nil, slot, "BackdropTemplate")
+        overrideBorder:SetPoint("TOPLEFT", -2, 2)
+        overrideBorder:SetPoint("BOTTOMRIGHT", 2, -2)
+        overrideBorder:SetBackdrop({
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            edgeSize = 14,
+        })
+        overrideBorder:SetBackdropBorderColor(1, 0.82, 0, 1)
+        overrideBorder:Hide()
+        slot.overrideBorder = overrideBorder
+
+        local icon = slot:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(16, 16)
+        icon:SetPoint("LEFT", 4, 0)
+        slot.icon = icon
+
+        local text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        text:SetPoint("LEFT", icon, "RIGHT", 4, 0)
+        text:SetPoint("RIGHT", -4, 0)
+        text:SetJustifyH("LEFT")
+        text:SetWordWrap(false)
+        text:SetText("")
+        slot.text = text
+
+        slot:EnableMouse(true)
+        slot.slotIndex = i
+        slot:SetScript("OnEnter", function(self)
+            local measure = state.currentMeasure
+            if not measure then return end
+            
+            local token = GetMeasureEmote(measure, self.slotIndex)
+            local emote = EMOTES[token] or EMOTES.PLACEHOLDER
+            local members = GetSortedRaidMembers()
+            local member = members[self.slotIndex]
+            
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("Slot " .. self.slotIndex)
+            if member then
+                GameTooltip:AddLine("Player: " .. member.name, 1, 1, 1)
+            end
+            GameTooltip:AddLine("Emote: " .. (emote.display or token), 1, 0.82, 0)
+            local isOverride = BeledarOrchestraDB.Overrides and BeledarOrchestraDB.Overrides[measure] and BeledarOrchestraDB.Overrides[measure][self.slotIndex]
+            if isOverride then
+                GameTooltip:AddLine("(Modified by leader)", 1, 0.5, 0)
+            end
+            if IsLeaderOrAssist() then
+                GameTooltip:AddLine("|cff00ff00Click to change|r")
+            end
+            GameTooltip:Show()
+        end)
+        slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        slot:SetScript("OnMouseDown", function(self)
+            if state.currentMeasure and IsLeaderOrAssist() then
+                OpenEmoteDropdown(self, state.currentMeasure, self.slotIndex)
+            end
+        end)
+
+        ui.assignmentSlots[i] = slot
+        slot:Hide()
+    end
+end
+
+CreateVersionGrid = function(parent)
+    local container = CreateFrame("Frame", nil, parent)
+    container:SetSize(706, 126)
+    container:SetPoint("TOPLEFT", parent, "TOPLEFT", 30, -470)
+    ui.versionContainer = container
+
+    local title = container:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 0, 2)
+    title:SetText("Addon Versions")
+    ui.versionTitle = title
+
+    ui.versionSlots = {}
+    local boxW, boxH = 70, 22
+    local gapW, gapH = 20, 4
+
+    for i = 1, RAID_SLOTS do
+        local slot = CreateFrame("Frame", nil, container, "BackdropTemplate")
+        slot:SetSize(boxW, boxH)
+        
+        local col = math.floor((i - 1) / 5)
+        local row = (i - 1) % 5
+        slot:SetPoint("TOPLEFT", col * (boxW + gapW), -row * (boxH + gapH))
+
+        local slotNum = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        slotNum:SetText(i)
+        slotNum:SetTextColor(0.7, 0.7, 0.7)
+        slotNum:SetPoint("RIGHT", slot, "LEFT", -2, 0)
+        slot.slotNum = slotNum
+        
+        slot:SetBackdrop({
+            bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            tile = true, tileSize = 8, edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 }
+        })
+        slot:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+        slot:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+        local text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        text:SetPoint("CENTER", 0, 0)
+        text:SetText("-")
+        slot.text = text
+
+        slot:EnableMouse(true)
+        slot:SetScript("OnEnter", function(self)
+            if self.playerName then
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(self.playerName)
+                GameTooltip:AddLine("Version: " .. (self.version or "|cffff0000Missing|r"), 1, 1, 1)
+                GameTooltip:Show()
+            end
+        end)
+        slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        ui.versionSlots[i] = slot
+        slot:Hide()
+    end
+end
+
+EnsureMismatchWidgets = function()
     if not ui.main or ui.mismatchContainer then
         return
     end
 
     local container = CreateFrame("Frame", nil, ui.main)
     container:SetSize(400, 110)
-    container:SetPoint("TOPLEFT", 20, -305)
+    container:SetPoint("TOPLEFT", 180, -305)
     ui.mismatchContainer = container
 
     local title = container:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -276,7 +647,7 @@ local function EnsureMismatchWidgets()
     end
 end
 
-local function RenderMismatchEntries(entries)
+RenderMismatchEntries = function(entries)
     EnsureMismatchWidgets()
     if not ui.mismatchWidgets then
         return
@@ -305,7 +676,7 @@ local function RenderMismatchEntries(entries)
     end
 end
 
-local function SetStatus(status, text, entries)
+SetStatus = function(status, text, entries)
     if state.status == status and state.mismatchText == text then
         local entriesChanged = false
         if entries and state.lastEntries then
@@ -349,7 +720,7 @@ local function SetStatus(status, text, entries)
     RenderMismatchEntries(entries or {})
 end
 
-local function BroadcastMeasure(measure)
+BroadcastMeasure = function(measure)
     if not IsInGroup() then
         return
     end
@@ -358,7 +729,7 @@ local function BroadcastMeasure(measure)
     C_ChatInfo.SendAddonMessage(PREFIX, "MEASURE:" .. tostring(measure or 0), channel)
 end
 
-local function SendPing()
+SendPing = function()
     if not IsInGroup() then
         return
     end
@@ -371,7 +742,7 @@ local function SendPing()
     Print("Sent version check to group...")
 end
 
-local function SendPong()
+SendPong = function()
     if not IsInGroup() then
         return
     end
@@ -380,13 +751,17 @@ local function SendPong()
     C_ChatInfo.SendAddonMessage(PREFIX, "PONG:" .. VERSION, channel)
 end
 
-local function SetMeasure(measure, silent)
+SetMeasure = function(measure, silent)
     if measure and (measure < 1 or measure > MAX_MEASURES) then
         Print("Measure must be between 1 and 25.")
         return
     end
 
     state.currentMeasure = measure
+    state.performedEmotes = {}
+    state.danceMoving = {}
+    state.danceComplete = {}
+    state.measureLocked = false
 
     if ui.measureLabel then
         ui.measureLabel:SetText(measure and ("Measure " .. measure) or "No measure")
@@ -405,33 +780,91 @@ local function SetMeasure(measure, silent)
         end
     end
 
+    UpdateAssignmentGrid()
+
     if not silent then
         BroadcastMeasure(measure)
     end
 end
 
-local function PressPlayerEmote()
+PressPlayerEmote = function()
     local slot = GetRaidSlotForPlayer()
-    if not slot or not state.currentMeasure then
+    local measure = state.currentMeasure
+
+    if not slot or not measure then
         UpdatePlayerPanel()
         slot = GetRaidSlotForPlayer()
-        if not slot or not state.currentMeasure then
-            return
-        end
+        measure = state.currentMeasure
     end
 
-    local token = GetMeasureEmote(state.currentMeasure, slot)
-    local emote = EMOTES[token]
-    if emote and emote.command then
-        DoEmote(emote.command)
+    if not slot then
+        Print("Cannot emote: no raid slot found.")
+        return
     end
+    if not measure then
+        Print("Cannot emote: no measure selected.")
+        return
+    end
+
+    if state.measureLocked then
+        Print("Measure already performed. Wait for a new measure or leader retry.")
+        return
+    end
+
+    local token = GetMeasureEmote(measure, slot)
+    if not token or token == "PLACEHOLDER" then
+        Print("Cannot emote: slot " .. slot .. " has no assignment for measure " .. measure .. ".")
+        return
+    end
+
+    local emote = EMOTES[token]
+    if not emote or not emote.command then
+        Print("Cannot emote: unknown emote token '" .. tostring(token) .. "'.")
+        return
+    end
+
+    DoEmote(emote.command)
+    state.measureLocked = true
+
+    if IsInGroup() then
+        local channel = IsInRaid() and "RAID" or "PARTY"
+        C_ChatInfo.SendAddonMessage(PREFIX, string.format("PERFORMED:%d:%d", measure, slot), channel)
+    end
+
+    -- If the emote is DANCE, register movement events
+    if token == "DANCE" then
+        frame:RegisterEvent("PLAYER_STARTED_MOVING")
+        frame:RegisterEvent("PLAYER_STOPPED_MOVING")
+    end
+
+    UpdatePlayerPanel()
 end
 
-local function PressBow()
+RetryMeasure = function()
+    if not state.currentMeasure then
+        Print("No measure selected.")
+        return
+    end
+    state.performedEmotes = {}
+    state.danceMoving = {}
+    state.danceComplete = {}
+    state.measureLocked = false
+
+    if IsInGroup() and IsLeaderOrAssist() then
+        local channel = IsInRaid() and "RAID" or "PARTY"
+        C_ChatInfo.SendAddonMessage(PREFIX, "RETRY:" .. tostring(state.currentMeasure), channel)
+    end
+
+    UpdateAssignmentGrid()
+    UpdatePlayerPanel()
+    ValidateTarget()
+end
+
+PressBow = function()
     DoEmote("BOW")
 end
 
-local function UpdatePlayerPanel()
+UpdatePlayerPanel = function()
     if not ui.playerFrame then
         return
     end
@@ -467,93 +900,112 @@ local function UpdatePlayerPanel()
         ui.playerSlotText:SetText(slot and ("Raid slot " .. slot) or "No raid slot")
     end
 
+    if ui.playerModifiedText then
+        local isModified = false
+        if slot and state.currentMeasure and BeledarOrchestraDB.Overrides and BeledarOrchestraDB.Overrides[state.currentMeasure] and BeledarOrchestraDB.Overrides[state.currentMeasure][slot] then
+            isModified = true
+        end
+        ui.playerModifiedText:SetShown(isModified)
+    end
+
     if ui.playerButton then
-        if not state.currentMeasure then
+        local mySlot = slot
+        local myToken = token
+        local isDance = myToken == "DANCE"
+        local danceNeedsMove = isDance and state.measureLocked and not state.danceMoving[mySlot]
+        local danceNeedsStop = isDance and state.measureLocked and state.danceMoving[mySlot] and not state.danceComplete[mySlot]
+        local danceFinished = isDance and state.measureLocked and state.danceComplete[mySlot]
+
+        if state.measureLocked then
+            if danceNeedsMove then
+                ui.playerButton:SetText("Move!")
+                ui.playerButton:SetEnabled(false)
+                ui.playerButton:SetAlpha(0.8)
+            elseif danceNeedsStop then
+                ui.playerButton:SetText("Stop Moving!")
+                ui.playerButton:SetEnabled(false)
+                ui.playerButton:SetAlpha(0.8)
+            elseif danceFinished then
+                ui.playerButton:SetText("Done!")
+                ui.playerButton:SetEnabled(false)
+                ui.playerButton:SetAlpha(0.5)
+            else
+                ui.playerButton:SetText("Done!")
+                ui.playerButton:SetEnabled(false)
+                ui.playerButton:SetAlpha(0.5)
+            end
+        elseif not state.currentMeasure then
             ui.playerButton:SetText("No measure")
+            ui.playerButton:SetEnabled(false)
+            ui.playerButton:SetAlpha(0.6)
         elseif not slot then
             ui.playerButton:SetText("No raid slot")
+            ui.playerButton:SetEnabled(false)
+            ui.playerButton:SetAlpha(0.6)
         elseif token == "PLACEHOLDER" then
             ui.playerButton:SetText("Placeholder")
+            ui.playerButton:SetEnabled(false)
+            ui.playerButton:SetAlpha(0.6)
         else
             ui.playerButton:SetText(emote.display)
+            ui.playerButton:SetEnabled(true)
+            ui.playerButton:SetAlpha(1)
         end
-
-        ui.playerButton:SetEnabled(enabled and true or false)
-        ui.playerButton:SetAlpha(enabled and 1 or 0.6)
         ui.playerButton:Show()
     end
 
     ui.playerFrame:Show()
 end
 
-local function ValidateTarget()
+ValidateTarget = function()
     if not ui.main or not ui.main:IsShown() then
         return
     end
+
+    local members = GetSortedRaidMembers()
 
     -- Update addon check status if pending
     if state.lastPingTime > 0 then
         local now = GetTime()
         local elapsed = now - state.lastPingTime
+        
         if elapsed < 5 then
             ui.addonStatusText:SetText(string.format("Checking addon... (%.1fs)", 5 - elapsed))
         else
-            local missing = {}
-            local versions = {}
-            local numMembers = GetNumGroupMembers()
-            local groupMembers = {}
-            
-            if IsInRaid() then
-                for i = 1, MAX_RAID_MEMBERS do
-                    local name = GetRaidRosterInfo(i)
-                    if name then
-                        table.insert(groupMembers, Ambiguate(name, "none"))
+            ui.addonStatusText:SetText("Check complete.")
+        end
+
+        if ui.versionSlots then
+            for i = 1, RAID_SLOTS do
+                local slot = ui.versionSlots[i]
+                local member = members[i]
+                if slot then
+                    if member then
+                        slot.playerName = member.name
+                        local v = state.activePlayers[member.name]
+                        slot.version = v
+                        
+                        if not v then
+                            slot.text:SetText("?")
+                            slot:SetBackdropColor(0.5, 0, 0, 0.8)
+                        elseif v == VERSION then
+                            slot.text:SetText(v)
+                            slot:SetBackdropColor(0, 0.5, 0, 0.8)
+                        else
+                            slot.text:SetText(v)
+                            slot:SetBackdropColor(0.5, 0.5, 0, 0.8)
+                        end
+                        slot:Show()
+                    else
+                        slot.playerName = nil
+                        slot:Hide()
                     end
                 end
-            elseif IsInGroup() then
-                for i = 1, numMembers do
-                    local unit = (i == numMembers) and "player" or ("party" .. i)
-                    local name = UnitFullName(unit)
-                    if name then
-                        table.insert(groupMembers, Ambiguate(name, "none"))
-                    end
-                end
-            end
-
-            for _, name in ipairs(groupMembers) do
-                local v = state.activePlayers[name]
-                if not v then
-                    table.insert(missing, name)
-                else
-                    versions[v] = versions[v] or {}
-                    table.insert(versions[v], name)
-                end
-            end
-            
-            local statusLines = {}
-            if #missing > 0 then
-                table.sort(missing)
-                table.insert(statusLines, "|cffff0000Missing:|r " .. table.concat(missing, ", "))
-            end
-
-            local sortedVersions = {}
-            for v in pairs(versions) do table.insert(sortedVersions, v) end
-            table.sort(sortedVersions, function(a, b) return a > b end)
-
-            for _, v in ipairs(sortedVersions) do
-                local names = versions[v]
-                table.sort(names)
-                local color = (v == VERSION) and "|cff00ff00" or "|cffffff00"
-                table.insert(statusLines, color .. "v" .. v .. ":|r " .. table.concat(names, ", "))
-            end
-            
-            if #statusLines == 0 then
-                ui.addonStatusText:SetText("|cffff0000No members detected.|r")
-            else
-                ui.addonStatusText:SetText(table.concat(statusLines, " | "))
             end
         end
     end
+
+    UpdateAssignmentGrid(members)
 
     if not state.currentMeasure then
         SetStatus("YELLOW", "No measure selected", {})
@@ -584,7 +1036,7 @@ local function ValidateTarget()
     end
 end
 
-local function MakeMovable(f)
+MakeMovable = function(f)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -594,7 +1046,7 @@ local function MakeMovable(f)
     end)
 end
 
-local function CreateBackdropFrame(name, parent, width, height)
+CreateBackdropFrame = function(name, parent, width, height)
     local f = CreateFrame("Frame", name, parent, "BackdropTemplate")
     f:SetSize(width, height)
     f:SetBackdrop({
@@ -610,9 +1062,65 @@ local function CreateBackdropFrame(name, parent, width, height)
     return f
 end
 
-local function CreateLeaderUI()
-    local main = CreateBackdropFrame("BeledarOrchestraMainFrame", UIParent, 440, 480)
-    main:SetPoint("CENTER", UIParent, "CENTER", -220, 0)
+StaticPopupDialogs["BELEDAR_SAVE_SET"] = {
+    text = "Enter name for the assignment set:",
+    button1 = "Save",
+    button2 = "Cancel",
+    hasEditBox = 1,
+    maxLetters = 32,
+    OnAccept = function(self)
+        local editBox = self.editBox or self.EditBox
+        local name = editBox:GetText()
+        if name and name ~= "" then
+            local m = state.currentMeasure
+            if not m then
+                Print("No measure selected. Cannot save set.")
+                return
+            end
+            BeledarOrchestraDB.SavedSets = BeledarOrchestraDB.SavedSets or {}
+            BeledarOrchestraDB.SavedSets[m] = BeledarOrchestraDB.SavedSets[m] or {}
+            
+            local copy = {}
+            if BeledarOrchestraDB.Overrides and BeledarOrchestraDB.Overrides[m] then
+                for s, token in pairs(BeledarOrchestraDB.Overrides[m]) do
+                    copy[s] = token
+                end
+            end
+            BeledarOrchestraDB.SavedSets[m][name] = copy
+            Print("Saved assignments for measure " .. m .. " as '" .. name .. "'")
+        end
+    end,
+    EditBoxOnEnterPressed = function(self)
+        local parent = self:GetParent()
+        StaticPopupDialogs["BELEDAR_SAVE_SET"].OnAccept(parent)
+        parent:Hide()
+    end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
+StaticPopupDialogs["BELEDAR_DELETE_SET"] = {
+    text = "Delete assignment set '%s' for measure %d?",
+    button1 = "Delete",
+    button2 = "Cancel",
+    OnAccept = function(self, data)
+        if data and data.measure and data.name then
+            if BeledarOrchestraDB.SavedSets and BeledarOrchestraDB.SavedSets[data.measure] then
+                BeledarOrchestraDB.SavedSets[data.measure][data.name] = nil
+                Print("Deleted set '" .. data.name .. "' for measure " .. data.measure)
+            end
+        end
+    end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+    showAlert = 1,
+}
+
+CreateLeaderUI = function()
+    local main = CreateBackdropFrame("BeledarOrchestraMainFrame", UIParent, 760, 750)
+    main:SetPoint("CENTER", UIParent, "CENTER", -380, 0)
     main:SetFrameStrata("MEDIUM")
     main:SetClampedToScreen(true)
     main:Hide()
@@ -637,16 +1145,17 @@ local function CreateLeaderUI()
 	ui.light = light
 
     local statusText = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	statusText:SetPoint("TOPRIGHT", -16, -66)
-	statusText:SetWidth(120)
-	statusText:SetJustifyH("CENTER")
+	statusText:ClearAllPoints()
+	statusText:SetPoint("RIGHT", light, "LEFT", -8, 0)
+	statusText:SetWidth(260)
+	statusText:SetJustifyH("RIGHT")
 	statusText:SetText("No measure selected")
 	ui.statusText = statusText
 
     ui.gridButtons = {}
 
-    local startX, startY = 16, -78
-    local btnW, btnH, gap = 54, 36, 8
+    local startX, startY = 173, -78
+    local btnW, btnH, gap = 78, 36, 6
     local index = 1
 
     for row = 1, 5 do
@@ -675,14 +1184,68 @@ local function CreateLeaderUI()
 
     local bowButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
     bowButton:SetSize(120, 36)
-    bowButton:SetPoint("BOTTOMLEFT", 16, 12)
+    bowButton:SetPoint("BOTTOMLEFT", 220, 15)
     bowButton:SetText("Bow")
     bowButton:SetScript("OnClick", PressBow)
     ui.bowButton = bowButton
 
+    local retryButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    retryButton:SetSize(120, 36)
+    retryButton:SetPoint("LEFT", bowButton, "RIGHT", 10, 0)
+    retryButton:SetText("Retry")
+    retryButton:SetScript("OnClick", function()
+        if not IsLeaderOrAssist() then
+            Print("Only raid leader or assist can retry.")
+            return
+        end
+        RetryMeasure()
+    end)
+    ui.retryButton = retryButton
+
+    local addonStatusText = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    addonStatusText:SetPoint("BOTTOMLEFT", 20, 52)
+    addonStatusText:SetWidth(720)
+    addonStatusText:SetJustifyH("CENTER")
+    addonStatusText:SetText("")
+    ui.addonStatusText = addonStatusText
+
+    CreateAssignmentGrid(main)
+    CreateVersionGrid(main)
+
+    ShowMode = function(mode)
+        if mode == "VERSION" then
+            ui.assignmentContainer:Hide()
+            ui.versionContainer:Show()
+            ui.btnAssign:SetEnabled(true)
+            ui.btnVersion:SetEnabled(false)
+            if ui.checkButton then ui.checkButton:Show() end
+        else
+            ui.assignmentContainer:Show()
+            ui.versionContainer:Hide()
+            ui.btnAssign:SetEnabled(false)
+            ui.btnVersion:SetEnabled(true)
+            if ui.checkButton then ui.checkButton:Hide() end
+            UpdateAssignmentGrid()
+        end
+    end
+
+    local btnAssign = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    btnAssign:SetSize(100, 22)
+    btnAssign:SetPoint("TOPLEFT", 278, -425)
+    btnAssign:SetText("Assignments")
+    btnAssign:SetScript("OnClick", function() ShowMode("ASSIGN") end)
+    ui.btnAssign = btnAssign
+
+    local btnVersion = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    btnVersion:SetSize(100, 22)
+    btnVersion:SetPoint("LEFT", btnAssign, "RIGHT", 4, 0)
+    btnVersion:SetText("Versions")
+    btnVersion:SetScript("OnClick", function() ShowMode("VERSION") end)
+    ui.btnVersion = btnVersion
+
     local checkButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
-    checkButton:SetSize(120, 36)
-    checkButton:SetPoint("LEFT", bowButton, "RIGHT", 10, 0)
+    checkButton:SetSize(120, 22)
+    checkButton:SetPoint("LEFT", btnVersion, "RIGHT", 10, 0)
     checkButton:SetText("Check Versions")
     checkButton:SetScript("OnClick", function()
         if not IsInGroup() then
@@ -691,14 +1254,147 @@ local function CreateLeaderUI()
         end
         SendPing()
     end)
+    checkButton:Hide()  -- Hidden initially since we start in ASSIGN mode
     ui.checkButton = checkButton
 
-    local addonStatusText = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    addonStatusText:SetPoint("BOTTOMLEFT", 16, 52)
-    addonStatusText:SetWidth(400)
-    addonStatusText:SetJustifyH("LEFT")
-    addonStatusText:SetText("")
-    ui.addonStatusText = addonStatusText
+    ShowMode("ASSIGN")
+
+    local btnSave = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    btnSave:SetSize(80, 22)
+    btnSave:SetPoint("BOTTOMLEFT", 256, 75)
+    btnSave:SetText("Save")
+    btnSave:SetScript("OnClick", function()
+        StaticPopup_Show("BELEDAR_SAVE_SET")
+    end)
+
+    local btnLoad = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    btnLoad:SetSize(80, 22)
+    btnLoad:SetPoint("LEFT", btnSave, "RIGHT", 4, 0)
+    btnLoad:SetText("Load")
+    btnLoad:SetScript("OnClick", function(self)
+        local m = state.currentMeasure
+        if not m then
+            Print("Select a measure first to load sets for it.")
+            return
+        end
+        
+        local measureSets = BeledarOrchestraDB.SavedSets and BeledarOrchestraDB.SavedSets[m] or {}
+        local names = {}
+        for name in pairs(measureSets) do
+            table.insert(names, name)
+        end
+        table.sort(names)
+
+        if MenuUtil and MenuUtil.CreateContextMenu then
+            MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+                rootDescription:CreateTitle("Load Set for Measure " .. m)
+                
+                if #names == 0 then
+                    rootDescription:CreateButton("No sets saved", function() end):SetEnabled(false)
+                    return
+                end
+                
+                for _, name in ipairs(names) do
+                    local node = rootDescription:CreateButton(name, function()
+                        local set = measureSets[name]
+                        if set then
+                            BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+                            BeledarOrchestraDB.Overrides[m] = {}
+                            for s, token in pairs(set) do
+                                BeledarOrchestraDB.Overrides[m][s] = token
+                            end
+                            Print("Loaded assignments for measure " .. m .. " from '" .. name .. "'")
+                            
+                            if IsInGroup() and IsLeaderOrAssist() then
+                                local channel = IsInRaid() and "RAID" or "PARTY"
+                                C_ChatInfo.SendAddonMessage(PREFIX, "CLEAR_MEASURE:" .. m, channel)
+                                for slot, token in pairs(set) do
+                                    C_ChatInfo.SendAddonMessage(PREFIX, string.format("OVERRIDE:%d:%d:%s", m, slot, token), channel)
+                                end
+                            end
+                            
+                            UpdateAssignmentGrid()
+                            UpdatePlayerPanel()
+                            ValidateTarget()
+                        end
+                    end)
+                    node:CreateButton("Delete", function()
+                        StaticPopup_Show("BELEDAR_DELETE_SET", name, m, { measure = m, name = name })
+                    end)
+                end
+            end)
+        else
+            -- Fallback for legacy clients
+            local menu = {
+                { text = "Load Set for Measure " .. m, isTitle = true, notCheckable = true },
+            }
+            if #names == 0 then
+                table.insert(menu, { text = "No sets saved", notCheckable = true, disabled = true })
+            else
+                for _, name in ipairs(names) do
+                    table.insert(menu, {
+                        text = name,
+                        func = function()
+                            local set = measureSets[name]
+                            if set then
+                                BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+                                BeledarOrchestraDB.Overrides[m] = {}
+                                for s, token in pairs(set) do
+                                    BeledarOrchestraDB.Overrides[m][s] = token
+                                end
+                                Print("Loaded assignments for measure " .. m .. " from '" .. name .. "'")
+                                
+                                if IsInGroup() and IsLeaderOrAssist() then
+                                    local channel = IsInRaid() and "RAID" or "PARTY"
+                                    C_ChatInfo.SendAddonMessage(PREFIX, "CLEAR_MEASURE:" .. m, channel)
+                                    for slot, token in pairs(set) do
+                                        C_ChatInfo.SendAddonMessage(PREFIX, string.format("OVERRIDE:%d:%d:%s", m, slot, token), channel)
+                                    end
+                                end
+                                
+                                UpdateAssignmentGrid()
+                                UpdatePlayerPanel()
+                                ValidateTarget()
+                            end
+                        end,
+                        notCheckable = true,
+                        hasArrow = true,
+                        menuList = {
+                            {
+                                text = "Delete",
+                                func = function()
+                                    StaticPopup_Show("BELEDAR_DELETE_SET", name, m, { measure = m, name = name })
+                                end,
+                                notCheckable = true,
+                            }
+                        }
+                    })
+                end
+            end
+            if not ui.dropdownFrame then
+                ui.dropdownFrame = CreateFrame("Frame", "BeledarOrchestraDropdown", UIParent, "UIDropDownMenuTemplate")
+            end
+            if _G.EasyMenu then
+                _G.EasyMenu(menu, ui.dropdownFrame, self, 0, 0, "MENU")
+            end
+        end
+    end)
+
+    local btnClear = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    btnClear:SetSize(140, 22)
+    btnClear:SetPoint("LEFT", btnLoad, "RIGHT", 4, 0)
+    btnClear:SetText("Clear Manual Assigns")
+    btnClear:SetScript("OnClick", function()
+        BeledarOrchestraDB.Overrides = {}
+        Print("Cleared all manual overrides.")
+        if IsInGroup() and IsLeaderOrAssist() then
+            local channel = IsInRaid() and "RAID" or "PARTY"
+            C_ChatInfo.SendAddonMessage(PREFIX, "CLEAR_OVERRIDES", channel)
+        end
+        UpdateAssignmentGrid()
+        UpdatePlayerPanel()
+        ValidateTarget()
+    end)
 
     local closeButton = CreateFrame("Button", nil, main, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", 0, 0)
@@ -706,7 +1402,7 @@ local function CreateLeaderUI()
     EnsureMismatchWidgets()
 end
 
-local function CreatePlayerUI()
+CreatePlayerUI = function()
     local playerFrame = CreateBackdropFrame("BeledarOrchestraPlayerFrame", UIParent, 260, 155)
     playerFrame:SetPoint("CENTER", UIParent, "CENTER", 360, -120)
     playerFrame:SetFrameStrata("MEDIUM")
@@ -730,6 +1426,12 @@ local function CreatePlayerUI()
     slotText:SetText("No raid slot")
     ui.playerSlotText = slotText
 
+    local modifiedText = playerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    modifiedText:SetPoint("TOP", slotText, "BOTTOM", 0, -2)
+    modifiedText:SetText("|cffffff00(Modified by leader)|r")
+    modifiedText:Hide()
+    ui.playerModifiedText = modifiedText
+
     local button = CreateFrame("Button", nil, playerFrame, "UIPanelButtonTemplate")
     button:SetSize(180, 44)
     button:SetPoint("BOTTOM", 0, 14)
@@ -744,7 +1446,7 @@ local function CreatePlayerUI()
     UpdatePlayerPanel()
 end
 
-SLASH_BELEDARORCHESTRA1 = "/bo"
+SLASH_BELEDARORCHESTRA1 = "/conductor"
 SlashCmdList.BELEDARORCHESTRA = function(msg)
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     cmd = cmd and cmd:lower() or ""
@@ -778,7 +1480,7 @@ SlashCmdList.BELEDARORCHESTRA = function(msg)
     elseif cmd == "measure" then
         local n = tonumber(rest)
         if not n then
-            Print("Usage: /bo measure <1-25>")
+            Print("Usage: /conductor measure <1-25>")
             return
         end
         SetMeasure(n)
@@ -806,7 +1508,7 @@ SlashCmdList.BELEDARORCHESTRA = function(msg)
         return
     end
 
-    Print("Commands: /bo, /bo show, /bo hide, /bo player, /bo playershow, /bo playerhide, /bo measure <1-25>, /bo reset, /bo debug, /bo slot")
+    Print("Commands: /conductor, /conductor show, /conductor hide, /conductor player, /conductor playershow, /conductor playerhide, /conductor measure <1-25>, /conductor reset, /conductor debug, /conductor slot")
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
@@ -814,6 +1516,39 @@ frame:SetScript("OnEvent", function(_, event, ...)
         local loadedName = ...
         if loadedName ~= ADDON_NAME then
             return
+        end
+
+        BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+        BeledarOrchestraDB.SavedSets = BeledarOrchestraDB.SavedSets or {}
+        
+        -- Migration from flat SavedSets to measure-based SavedSets
+        local needsMigration = false
+        for k, v in pairs(BeledarOrchestraDB.SavedSets) do
+            if type(k) == "string" and type(v) == "table" then
+                for mk in pairs(v) do
+                    if type(mk) == "number" then
+                        needsMigration = true
+                        break
+                    end
+                end
+            end
+            if needsMigration then break end
+        end
+
+        if needsMigration then
+            local newSets = {}
+            for name, set in pairs(BeledarOrchestraDB.SavedSets) do
+                if type(name) == "string" and type(set) == "table" then
+                    for m, slots in pairs(set) do
+                        if type(m) == "number" then
+                            newSets[m] = newSets[m] or {}
+                            newSets[m][name] = slots
+                        end
+                    end
+                end
+            end
+            BeledarOrchestraDB.SavedSets = newSets
+            Print("Migrated assignment sets to measure-based format.")
         end
 
         C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
@@ -838,11 +1573,72 @@ frame:SetScript("OnEvent", function(_, event, ...)
             SetMeasure(n, true)
             UpdatePlayerPanel()
             ValidateTarget()
+        elseif action == "OVERRIDE" then
+            local measure, slot, token = select(2, strsplit(":", message))
+            measure = tonumber(measure)
+            slot = tonumber(slot)
+            if measure and slot and token then
+                BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
+                BeledarOrchestraDB.Overrides[measure] = BeledarOrchestraDB.Overrides[measure] or {}
+                BeledarOrchestraDB.Overrides[measure][slot] = token
+                UpdateAssignmentGrid()
+                UpdatePlayerPanel()
+                ValidateTarget()
+            end
+        elseif action == "CLEAR_OVERRIDES" then
+            BeledarOrchestraDB.Overrides = {}
+            UpdateAssignmentGrid()
+            UpdatePlayerPanel()
+            ValidateTarget()
+        elseif action == "CLEAR_MEASURE" then
+            local m = tonumber(value)
+            if m and BeledarOrchestraDB.Overrides then
+                BeledarOrchestraDB.Overrides[m] = nil
+                UpdateAssignmentGrid()
+                UpdatePlayerPanel()
+                ValidateTarget()
+            end
         elseif action == "PING" then
             SendPong()
         elseif action == "PONG" then
             local name = Ambiguate(sender, "none")
             state.activePlayers[name] = value or "Unknown"
+        elseif action == "PERFORMED" then
+            local measure, slot = select(2, strsplit(":", message))
+            measure = tonumber(measure)
+            slot = tonumber(slot)
+            if measure == state.currentMeasure and slot then
+                state.performedEmotes[slot] = true
+                state.measureLocked = true
+                UpdateAssignmentGrid()
+            end
+        elseif action == "DANCE_MOVING" then
+            local measure, slot = select(2, strsplit(":", message))
+            measure = tonumber(measure)
+            slot = tonumber(slot)
+            if measure == state.currentMeasure and slot then
+                state.danceMoving[slot] = true
+                UpdateAssignmentGrid()
+            end
+        elseif action == "DANCE_STOPPED" then
+            local measure, slot = select(2, strsplit(":", message))
+            measure = tonumber(measure)
+            slot = tonumber(slot)
+            if measure == state.currentMeasure and slot then
+                state.danceComplete[slot] = true
+                UpdateAssignmentGrid()
+            end
+        elseif action == "RETRY" then
+            local m = tonumber(value)
+            if m == state.currentMeasure then
+                state.performedEmotes = {}
+                state.danceMoving = {}
+                state.danceComplete = {}
+                state.measureLocked = false
+                UpdateAssignmentGrid()
+                UpdatePlayerPanel()
+                ValidateTarget()
+            end
         end
 
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" then
@@ -858,6 +1654,38 @@ frame:SetScript("OnEvent", function(_, event, ...)
         local unit = ...
         if unit == "target" then
             ValidateTarget()
+        end
+
+    elseif event == "PLAYER_STARTED_MOVING" then
+        local slot = GetRaidSlotForPlayer()
+        local measure = state.currentMeasure
+        if slot and measure and state.measureLocked then
+            local token = GetMeasureEmote(measure, slot)
+            if token == "DANCE" and not state.danceMoving[slot] then
+                state.danceMoving[slot] = true
+                if IsInGroup() then
+                    local channel = IsInRaid() and "RAID" or "PARTY"
+                    C_ChatInfo.SendAddonMessage(PREFIX, string.format("DANCE_MOVING:%d:%d", measure, slot), channel)
+                end
+                UpdatePlayerPanel()
+            end
+        end
+
+    elseif event == "PLAYER_STOPPED_MOVING" then
+        local slot = GetRaidSlotForPlayer()
+        local measure = state.currentMeasure
+        if slot and measure and state.measureLocked then
+            local token = GetMeasureEmote(measure, slot)
+            if token == "DANCE" and state.danceMoving[slot] and not state.danceComplete[slot] then
+                state.danceComplete[slot] = true
+                if IsInGroup() then
+                    local channel = IsInRaid() and "RAID" or "PARTY"
+                    C_ChatInfo.SendAddonMessage(PREFIX, string.format("DANCE_STOPPED:%d:%d", measure, slot), channel)
+                end
+                frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+                frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
+                UpdatePlayerPanel()
+            end
         end
     end
 end)
