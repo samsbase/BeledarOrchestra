@@ -1,8 +1,13 @@
-## Interface: 120000
+﻿## Interface: 120000
 ## Title: Beledar Orchestra
 ## Notes: Raid coordination helper for the Hallowfall flame puzzle.
 ## Author: Samsbase
-## Version: 0.2.0
+## Version: 0.3.3
 ## SavedVariables: BeledarOrchestraDB
 Measures.lua
-BeledarOrchestra.lua
+Core.lua
+Data.lua
+Comm.lua
+UI\PlayerUI.lua
+UI\LeaderUI.lua
+Init.lua

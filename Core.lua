@@ -1,0 +1,116 @@
+﻿local ADDON_NAME, ns = ...
+
+-- Saved variables (initialized in ADDON_LOADED)
+BeledarOrchestraDB = BeledarOrchestraDB or {}
+
+-- Constants
+ns.PREFIX = "BeledarOrch"
+ns.TARGET_NPC_ID = 255888
+ns.UPDATE_INTERVAL = 0.2
+ns.MAX_MEASURES = 25
+ns.RAID_SLOTS = 40
+
+ns.VERSION = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "Unknown"
+ns.ADDON_NAME = ADDON_NAME
+
+-- Shared state
+ns.state = {
+    currentMeasure = nil,
+    status = "YELLOW",
+    mismatchText = "No measure selected",
+    lastUpdate = 0,
+    activePlayers = {},
+    lastPingTime = 0,
+    performedEmotes = {},
+    danceMoving = {},
+    danceComplete = {},
+    measureLocked = false,
+    measureStarted = false,
+    countdownEndTime = nil,
+    countdownDuration = 10,
+}
+
+-- Shared UI table
+ns.ui = {}
+
+-- Main event frame
+ns.frame = CreateFrame("Frame")
+
+-- Utility functions
+function ns.Print(msg)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff99ccffBeledar Orchestra:|r " .. tostring(msg))
+end
+
+function ns.GetNpcID(unit)
+    local guid = UnitGUID(unit)
+    if not guid then return nil end
+    local type, _, _, _, _, npcID = strsplit("-", guid)
+    if type == "Creature" or type == "Vehicle" then
+        return tonumber(npcID)
+    end
+    return nil
+end
+
+function ns.IsTargetNpc(unit)
+    return ns.GetNpcID(unit) == ns.TARGET_NPC_ID
+end
+
+function ns.IsLeaderOrAssist()
+    return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+end
+
+function ns.HasAura(unit, spellId)
+    if not unit or not spellId then return false end
+
+    for i = 1, 255 do
+        local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
+        if not aura then break end
+        if type(aura) == "table" and aura.spellId == spellId then
+            return true
+        end
+    end
+
+    return false
+end
+
+function ns.MakeMovable(f)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+    end)
+end
+
+function ns.CreateBackdropFrame(name, parent, width, height)
+    local f = CreateFrame("Frame", name, parent, "BackdropTemplate")
+    f:SetSize(width, height)
+    f:SetBackdrop({
+        bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    f:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
+    f:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+    return f
+end
+
+function ns.GetSpellNameSafe(spellId)
+    if C_Spell and C_Spell.GetSpellName then
+        local n = C_Spell.GetSpellName(spellId)
+        if n then return n end
+    end
+    return tostring(spellId)
+end
+
+function ns.GetSpellTextureSafe(spellId)
+    if C_Spell and C_Spell.GetSpellTexture then
+        local t = C_Spell.GetSpellTexture(spellId)
+        if t then return t end
+    end
+    return 134400
+end
