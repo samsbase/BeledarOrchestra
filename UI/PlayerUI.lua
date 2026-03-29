@@ -190,6 +190,10 @@ function ns.CreatePlayerUI()
     title:SetPoint("TOP", 0, -14)
     title:SetText("Beledar Assignment")
 
+    local versionText = playerFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    versionText:SetPoint("TOPLEFT", playerFrame, "TOPLEFT", 8, -10)
+    versionText:SetText("v" .. (C_AddOns.GetAddOnMetadata("BeledarOrchestra", "Version") or "?"))
+
     local measureText = playerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     measureText:SetPoint("TOP", title, "BOTTOM", 0, -10)
     measureText:SetText("Waiting for measure")
