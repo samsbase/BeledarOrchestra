@@ -3,7 +3,7 @@ local ADDON_NAME, ns = ...
 BeledarOrchestraDB = BeledarOrchestraDB or {}
 
 local PREFIX = "BeledarOrch"
-local TARGET_NAME = "Divine Flame of Beledar"
+local TARGET_NPC_ID = 255888
 local UPDATE_INTERVAL = 0.2
 local MAX_MEASURES = 25
 local RAID_SLOTS = 40
@@ -43,6 +43,20 @@ local ui = {}
 
 local function Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff99ccffBeledar Orchestra:|r " .. tostring(msg))
+end
+
+local function GetNpcID(unit)
+    local guid = UnitGUID(unit)
+    if not guid then return nil end
+    local type, _, _, _, _, npcID = strsplit("-", guid)
+    if type == "Creature" or type == "Vehicle" then
+        return tonumber(npcID)
+    end
+    return nil
+end
+
+local function IsTargetNpc(unit)
+    return GetNpcID(unit) == TARGET_NPC_ID
 end
 
 local function IsLeaderOrAssist()
@@ -420,8 +434,7 @@ local function UpdatePlayerPanel()
         return
     end
 
-    local targetName = UnitName("target")
-    local isTargeted = (targetName == TARGET_NAME)
+    local isTargeted = IsTargetNpc("target")
 
     if not isTargeted then
         if ui.playerFrame:IsShown() then
@@ -523,8 +536,7 @@ local function ValidateTarget()
         return
     end
 
-    local targetName = UnitName("target")
-    if not targetName or targetName ~= TARGET_NAME then
+    if not IsTargetNpc("target") then
         SetStatus("YELLOW", "Target the Divine Flame of Beledar", {})
         return
     end
