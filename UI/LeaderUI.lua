@@ -742,6 +742,7 @@ function ns.CreateLeaderUI()
             return
         end
         ns.SendPing()
+        if ns.DS_BroadcastMeasures then ns.DS_BroadcastMeasures() end
     end)
     checkButton:Hide()
     ui.checkButton = checkButton
