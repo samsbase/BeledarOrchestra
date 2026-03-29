@@ -169,11 +169,8 @@ end)
 
 -- OnUpdate timer
 frame:SetScript("OnUpdate", function(_, elapsed)
-    if not ((ui.main and ui.main:IsShown()) or (ui.playerFrame and ui.playerFrame:IsShown())) then
-        return
-    end
-
-    -- Countdown tick: transition to measureStarted when countdown expires
+    -- Countdown tick: always check even if no UI is visible, so measureStarted
+    -- is set promptly when the countdown expires (player may not be targeting NPC)
     if state.countdownEndTime and not state.measureStarted then
         local remaining = state.countdownEndTime - GetTime()
         if remaining <= 0 then
@@ -182,6 +179,10 @@ frame:SetScript("OnUpdate", function(_, elapsed)
             ns.UpdatePlayerPanel()
             ns.UpdateAssignmentGrid()
         end
+    end
+
+    if not ((ui.main and ui.main:IsShown()) or (ui.playerFrame and ui.playerFrame:IsShown())) then
+        return
     end
 
     state.lastUpdate = state.lastUpdate + elapsed

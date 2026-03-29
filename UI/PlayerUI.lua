@@ -86,9 +86,12 @@ function ns.UpdatePlayerPanel()
                     ui.playerButton:SetEnabled(false)
                     ui.playerButton:SetAlpha(0.8)
                 else
-                    ui.playerButton:SetText(emote.display .. " (waiting)")
-                    ui.playerButton:SetEnabled(false)
-                    ui.playerButton:SetAlpha(0.6)
+                    -- Countdown finished but OnUpdate hasn't flipped the flag yet; do it now
+                    state.measureStarted = true
+                    state.countdownEndTime = nil
+                    ui.playerButton:SetText(emote.display)
+                    ui.playerButton:SetEnabled(true)
+                    ui.playerButton:SetAlpha(1)
                 end
             else
                 ui.playerButton:SetText(emote.display .. " (waiting)")
@@ -126,8 +129,14 @@ function ns.PressPlayerEmote()
     end
 
     if not state.measureStarted then
-        Print("Cannot emote: leader has not started the countdown yet.")
-        return
+        -- Check if countdown actually expired but flag wasn't set yet (race with OnUpdate)
+        if state.countdownEndTime and (state.countdownEndTime - GetTime()) <= 0 then
+            state.measureStarted = true
+            state.countdownEndTime = nil
+        else
+            Print("Cannot emote: leader has not started the countdown yet.")
+            return
+        end
     end
 
     if state.measureLocked then

@@ -9,7 +9,7 @@ ns.EMOTES = {
     DANCE = { command = "DANCE", display = "/dance", spellId = 1266758 },
     VIOLIN = { command = "VIOLIN", display = "/violin", spellId = 1266761 },
     APPLAUD = { command = "APPLAUD", display = "/applaud", spellId = 1266754 },
-    CONGRATS = { command = "CONGRATULATE", display = "/congrats", spellId = 1266755 },
+    CONGRATS = { command = "CONGRATULATE", display = "/congratulate", spellId = 1266755 },
     ROAR = { command = "ROAR", display = "/roar", spellId = 1266759 },
     BOW = { command = "BOW", display = "/bow", spellId = nil },
     PLACEHOLDER = { command = nil, display = "?", spellId = nil },

@@ -76,7 +76,6 @@ function ns.HandleAddonMessage(message, sender)
         slot = tonumber(slot)
         if measure == state.currentMeasure and slot then
             state.performedEmotes[slot] = true
-            state.measureLocked = true
             ns.UpdateAssignmentGrid()
         end
 
@@ -107,6 +106,8 @@ function ns.HandleAddonMessage(message, sender)
             state.measureLocked = false
             state.measureStarted = false
             state.countdownEndTime = nil
+            ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+            ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
             ns.UpdateAssignmentGrid()
             ns.UpdatePlayerPanel()
             ns.ValidateTarget()

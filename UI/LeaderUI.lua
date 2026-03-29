@@ -435,6 +435,8 @@ function ns.SetMeasure(measure, silent)
     state.measureLocked = false
     state.measureStarted = false
     state.countdownEndTime = nil
+    ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+    ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
 
     if ui.measureLabel then
         ui.measureLabel:SetText(measure and ("Measure " .. measure) or "No measure")
@@ -471,6 +473,8 @@ function ns.RetryMeasure()
     state.measureLocked = false
     state.measureStarted = false
     state.countdownEndTime = nil
+    ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+    ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
 
     if IsInGroup() and ns.IsLeaderOrAssist() then
         local channel = IsInRaid() and "RAID" or "PARTY"
