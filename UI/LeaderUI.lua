@@ -500,31 +500,34 @@ function ns.ValidateTarget()
         else
             ui.addonStatusText:SetText("Check complete.")
         end
+    end
 
-        if ui.versionSlots then
-            for i = 1, RAID_SLOTS do
-                local slot = ui.versionSlots[i]
-                local member = members[i]
-                if slot then
-                    if member then
-                        slot.playerName = member.name
-                        local v = state.activePlayers[member.name]
-                        slot.version = v
-                        if not v then
-                            slot.text:SetText("?")
-                            slot:SetBackdropColor(0.5, 0, 0, 0.8)
-                        elseif v == ns.VERSION then
-                            slot.text:SetText(v)
-                            slot:SetBackdropColor(0, 0.5, 0, 0.8)
-                        else
-                            slot.text:SetText(v)
-                            slot:SetBackdropColor(0.5, 0.5, 0, 0.8)
-                        end
-                        slot:Show()
+    if ui.versionSlots then
+        for i = 1, RAID_SLOTS do
+            local slot = ui.versionSlots[i]
+            local member = members[i]
+            if slot then
+                if member then
+                    slot.playerName = member.name
+                    local v = state.activePlayers[member.name]
+                    slot.version = v
+                    if state.lastPingTime == 0 then
+                        slot.text:SetText("-")
+                        slot:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+                    elseif not v then
+                        slot.text:SetText("?")
+                        slot:SetBackdropColor(0.5, 0, 0, 0.8)
+                    elseif v == ns.VERSION then
+                        slot.text:SetText(v)
+                        slot:SetBackdropColor(0, 0.5, 0, 0.8)
                     else
-                        slot.playerName = nil
-                        slot:Hide()
+                        slot.text:SetText(v)
+                        slot:SetBackdropColor(0.5, 0.5, 0, 0.8)
                     end
+                    slot:Show()
+                else
+                    slot.playerName = nil
+                    slot:Hide()
                 end
             end
         end
@@ -664,6 +667,10 @@ function ns.CreateLeaderUI()
     local title = main:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 14, -14)
     title:SetText("Beledar Orchestra Conductor")
+
+    local versionText = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    versionText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+    versionText:SetText("v" .. (C_AddOns.GetAddOnMetadata("BeledarOrchestra", "Version") or "?"))
 
     local measureLabel = main:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     measureLabel:SetPoint("TOPLEFT", 14, -42)
@@ -1086,4 +1093,7 @@ function ns.CreateLeaderUI()
     closeButton:SetPoint("TOPRIGHT", 0, 0)
 
     ns.EnsureMismatchWidgets()
+
+    -- Re-apply ShowMode now that all buttons exist
+    ShowMode(currentViewMode or "ASSIGN")
 end
