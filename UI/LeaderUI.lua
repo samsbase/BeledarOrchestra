@@ -1091,6 +1091,10 @@ function ns.CreateLeaderUI()
 
     local closeButton = CreateFrame("Button", nil, main, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", 0, 0)
+    closeButton:SetScript("OnClick", function()
+        state.leaderUIOpen = false
+        main:Hide()
+    end)
 
     ns.EnsureMismatchWidgets()
 

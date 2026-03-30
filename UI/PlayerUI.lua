@@ -11,10 +11,14 @@ function ns.UpdatePlayerPanel()
     local isTargeted = ns.IsTargetNpc("target")
     if not isTargeted then
         if ui.playerFrame:IsShown() then ui.playerFrame:Hide() end
+        state.playerUIClosed = nil
         return
     end
 
-    if not ui.playerFrame:IsShown() then ui.playerFrame:Show() end
+    if not ui.playerFrame:IsShown() then
+        if state.playerUIClosed then return end
+        ui.playerFrame:Show()
+    end
 
     local slot = ns.GetRaidSlotForPlayer()
     local token = "PLACEHOLDER"
@@ -220,6 +224,10 @@ function ns.CreatePlayerUI()
 
     local closeButton = CreateFrame("Button", nil, playerFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", 0, 0)
+    closeButton:SetScript("OnClick", function()
+        state.playerUIClosed = true
+        playerFrame:Hide()
+    end)
 
     ns.UpdatePlayerPanel()
 end

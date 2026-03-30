@@ -19,27 +19,35 @@ SlashCmdList.BELEDARORCHESTRA = function(msg)
     if cmd == "" then
         if ui.main:IsShown() then
             ui.main:Hide()
+            state.leaderUIOpen = false
         else
             ui.main:Show()
+            state.leaderUIOpen = true
         end
         return
     elseif cmd == "show" then
         ui.main:Show()
+        state.leaderUIOpen = true
         return
     elseif cmd == "hide" then
         ui.main:Hide()
+        state.leaderUIOpen = false
         return
     elseif cmd == "player" then
         if ui.playerFrame:IsShown() then
+            state.playerUIClosed = true
             ui.playerFrame:Hide()
         else
+            state.playerUIClosed = nil
             ui.playerFrame:Show()
         end
         return
     elseif cmd == "playershow" then
+        state.playerUIClosed = nil
         ui.playerFrame:Show()
         return
     elseif cmd == "playerhide" then
+        state.playerUIClosed = true
         ui.playerFrame:Hide()
         return
     elseif cmd == "measure" then
@@ -80,8 +88,8 @@ end
 frame:SetScript("OnEvent", function(_, event, ...)
     if event == "ZONE_CHANGED_NEW_AREA" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
         if IsInCorrectZone() then
-            if ui.main then ui.main:Show() end
-            if ui.playerFrame then ui.playerFrame:Show() end
+            if ui.main and state.leaderUIOpen then ui.main:Show() end
+            if ui.playerFrame and ns.IsTargetNpc("target") then ui.playerFrame:Show() end
         else
             if ui.main then ui.main:Hide() end
             if ui.playerFrame then ui.playerFrame:Hide() end
