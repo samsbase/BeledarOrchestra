@@ -203,7 +203,7 @@ function ns.BuildObservedCounts()
 
     for _, emote in pairs(ns.EMOTES) do
         if emote.spellId then
-            local aura = C_UnitAuras.GetAuraDataBySpellID("target", emote.spellId, "HELPFUL")
+            local aura = ns.GetAuraData("target", emote.spellId, "HELPFUL")
             if aura then
                 anyAura = true
                 observed[emote.spellId] = (aura.applications or 0) > 0 and aura.applications or 1

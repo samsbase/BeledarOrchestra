@@ -56,10 +56,33 @@ function ns.IsLeaderOrAssist()
     return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
 end
 
+function ns.GetAuraData(unit, spellId, filter)
+    if not unit or not spellId then return nil end
+    filter = filter or "HELPFUL"
+    for i = 1, 255 do
+        local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
+        if not aura then break end
+
+        local auraSpellId = aura.spellId
+        if auraSpellId then
+            -- Use HasAnySecretValues if available (WoW 11.0.5+) to avoid crashes when 
+            -- comparing "secret number values" (private auras) to a regular number.
+            local isSecret = HasAnySecretValues and HasAnySecretValues(auraSpellId)
+            if not isSecret then
+                -- Still use pcall for absolute safety against comparison errors 
+                -- in all client versions.
+                local success, match = pcall(function() return auraSpellId == spellId end)
+                if success and match then
+                    return aura
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function ns.HasAura(unit, spellId)
-    if not unit or not spellId then return false end
-    local aura = C_UnitAuras.GetAuraDataBySpellID(unit, spellId, "HELPFUL")
-    return aura ~= nil
+    return ns.GetAuraData(unit, spellId) ~= nil
 end
 
 function ns.MakeMovable(f)

@@ -1,4 +1,4 @@
-﻿Beledar Orchestra v0.4.13
+﻿Beledar Orchestra v0.4.15
 ========================
 
 A World of Warcraft addon for coordinating the Hallowfall Beledar flame
@@ -18,6 +18,7 @@ General:
 - Auto-show/hide panels when entering/leaving the zone.
 - Leader UI opens automatically for leaders/assists when targeting the Divine
   Flame of Beledar.
+- Robust private aura handling using HasAnySecretValues and pcall.
 
 Leader / Assist Panel ("Beledar Orchestra Conductor"):
 - 5x5 measure selection grid (25 measures, 40 raid slots each).
