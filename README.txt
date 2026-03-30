@@ -1,4 +1,4 @@
-﻿Beledar Orchestra v0.4.1
+﻿Beledar Orchestra v0.4.12
 ========================
 
 A World of Warcraft addon for coordinating the Hallowfall Beledar flame
@@ -13,15 +13,22 @@ Install
 
 Features
 --------
+General:
+- Addon only loads/shows when in Hallowfall (Zone ID 2215) and not in combat.
+- Auto-show/hide panels when entering/leaving the zone.
+- Leader UI opens automatically for leaders/assists when targeting the Divine
+  Flame of Beledar.
+
 Leader / Assist Panel ("Beledar Orchestra Conductor"):
 - 5x5 measure selection grid (25 measures, 40 raid slots each).
 - Traffic-light indicator: green when auras match, red on mismatch, yellow
   when no measure is selected or the target is wrong.
-- "Start" button initiates a 10-second countdown (via /cd 10) before
+- "Start" button initiates a countdown (default 10s, configurable) before
   player emote buttons activate.
-- "Retry" button resets the measure state without clearing manual
-  assignments, re-enabling everyone's buttons.
-- "Lock in (Bow)" button for the leader/assist.
+- "Countdown 5s" button for a quick 5-second countdown.
+- "Retry" button resets the measure state and cancels any active in-game
+  countdowns (/cd 0).
+- "Lock in (Bow)" button for the leader/assist (glows when all auras match).
 
 Assignment Management:
 - Assigned Emotes grid (8 columns x 5 rows, matching WoW raid frames)
@@ -43,6 +50,7 @@ Version Checking:
 
 Player Panel ("Beledar Assignment"):
 - Shows the player's raid slot, current measure, and assigned emote.
+- Displays the addon version in the top-left corner.
 - Emote button stays disabled and shows "(waiting)" until the leader
   presses Start and the countdown completes.
 - After pressing Dance, the button changes to "Move!" then "Stop Moving!"

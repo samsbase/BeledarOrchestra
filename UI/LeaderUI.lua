@@ -47,6 +47,14 @@ function ns.SetStatus(status, text, entries)
         ui.statusText:SetText(text or "")
     end
 
+    if ui.bowButton and ActionButton_ShowOverlayGlow then
+        if status == "GREEN" then
+            ActionButton_ShowOverlayGlow(ui.bowButton)
+        else
+            ActionButton_HideOverlayGlow(ui.bowButton)
+        end
+    end
+
     ns.RenderMismatchEntries(entries or {})
 end
 
@@ -463,22 +471,27 @@ function ns.SetMeasure(measure, silent)
 end
 
 function ns.RetryMeasure()
+    if ns.IsLeaderOrAssist() then
+        C_PartyInfo.DoCountdown(0)
+    end
+    state.countdownEndTime = nil
+
     if not state.currentMeasure then
         Print("No measure selected.")
-        return
-    end
-    state.performedEmotes = {}
-    state.danceMoving = {}
-    state.danceComplete = {}
-    state.measureLocked = false
-    state.measureStarted = false
-    state.countdownEndTime = nil
-    ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
-    ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
+    else
+        state.performedEmotes = {}
+        state.danceMoving = {}
+        state.danceComplete = {}
+        state.measureLocked = false
+        state.measureStarted = false
+        
+        ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+        ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
 
-    if IsInGroup() and ns.IsLeaderOrAssist() then
-        local channel = IsInRaid() and "RAID" or "PARTY"
-        C_ChatInfo.SendAddonMessage(PREFIX, "RETRY:" .. tostring(state.currentMeasure), channel)
+        if IsInGroup() and ns.IsLeaderOrAssist() then
+            local channel = IsInRaid() and "RAID" or "PARTY"
+            C_ChatInfo.SendAddonMessage(PREFIX, "RETRY:" .. tostring(state.currentMeasure), channel)
+        end
     end
 
     ns.UpdateAssignmentGrid()
@@ -802,16 +815,32 @@ function ns.CreateLeaderUI()
             for idx = 1, MAX_MEASURES do
                 if ui.gridButtons[idx] then ui.gridButtons[idx]:SetEnabled(true) end
             end
-            if ui.bowButton then ui.bowButton:Show() end
+            if ui.bowButton then
+                ui.bowButton:Show()
+                if ActionButton_ShowOverlayGlow then
+                    if state.status == "GREEN" then
+                        ActionButton_ShowOverlayGlow(ui.bowButton)
+                    else
+                        ActionButton_HideOverlayGlow(ui.bowButton)
+                    end
+                end
+            end
             if ui.startButton then ui.startButton:Show() end
             if ui.retryButton then ui.retryButton:Show() end
+            if ui.countdownButton then ui.countdownButton:Show() end
         else
             for idx = 1, MAX_MEASURES do
                 if ui.gridButtons[idx] then ui.gridButtons[idx]:SetEnabled(false) end
             end
-            if ui.bowButton then ui.bowButton:Hide() end
+            if ui.bowButton then
+                ui.bowButton:Hide()
+                if ActionButton_HideOverlayGlow then
+                    ActionButton_HideOverlayGlow(ui.bowButton)
+                end
+            end
             if ui.startButton then ui.startButton:Hide() end
             if ui.retryButton then ui.retryButton:Hide() end
+            if ui.countdownButton then ui.countdownButton:Hide() end
         end
     end
     ns.ShowMode = ShowMode
@@ -1028,10 +1057,10 @@ function ns.CreateLeaderUI()
     end)
     ui.btnImport = btnImport
 
-    -- Action buttons row: Lock in (Bow) / Start / Retry
+    -- Action buttons row: Lock in (Bow) / Start / Retry / Countdown
     local actionBtnW = 110
     local actionGap = 8
-    local actionTotalW = actionBtnW * 3 + actionGap * 2
+    local actionTotalW = actionBtnW * 4 + actionGap * 3
     local actionStartX = math.floor((760 - actionTotalW) / 2)
 
     local bowButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
@@ -1057,7 +1086,7 @@ function ns.CreateLeaderUI()
         local dur = state.countdownDuration
         state.countdownEndTime = GetTime() + dur
         state.measureStarted = false
-        C_PartyInfo.DoCountdown(10)
+        C_PartyInfo.DoCountdown(dur)
         if IsInGroup() then
             local channel = IsInRaid() and "RAID" or "PARTY"
             C_ChatInfo.SendAddonMessage(PREFIX, "START:" .. tostring(state.currentMeasure) .. ":" .. tostring(dur), channel)
@@ -1080,6 +1109,28 @@ function ns.CreateLeaderUI()
         ns.RetryMeasure()
     end)
     ui.retryButton = retryButton
+
+    local countdownButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+    countdownButton:SetSize(actionBtnW, 36)
+    countdownButton:SetPoint("LEFT", retryButton, "RIGHT", actionGap, 0)
+    countdownButton:SetText("Countdown 5s")
+    countdownButton:SetScript("OnClick", function()
+        if not ns.IsLeaderOrAssist() then
+            Print("Only raid leader or assist can start a countdown.")
+            return
+        end
+        local dur = 5
+        state.countdownEndTime = GetTime() + dur
+        state.measureStarted = false
+        C_PartyInfo.DoCountdown(dur)
+        if state.currentMeasure and IsInGroup() then
+            local channel = IsInRaid() and "RAID" or "PARTY"
+            C_ChatInfo.SendAddonMessage(PREFIX, "START:" .. tostring(state.currentMeasure) .. ":" .. tostring(dur), channel)
+        end
+        ns.UpdatePlayerPanel()
+        ns.UpdateAssignmentGrid()
+    end)
+    ui.countdownButton = countdownButton
 
     local addonStatusText = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     addonStatusText:SetPoint("BOTTOMLEFT", 20, 52)

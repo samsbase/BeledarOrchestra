@@ -150,6 +150,12 @@ frame:SetScript("OnEvent", function(_, event, ...)
         return
 
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" then
+        if event == "PLAYER_TARGET_CHANGED" and IsInCorrectZone() and ns.IsLeaderOrAssist() and ns.IsTargetNpc("target") then
+            if ui.main and not ui.main:IsShown() then
+                ui.main:Show()
+                state.leaderUIOpen = true
+            end
+        end
         ns.UpdatePlayerPanel()
         ns.ValidateTarget()
         if event == "GROUP_ROSTER_UPDATE" and ns.ShowMode and state.currentViewMode then

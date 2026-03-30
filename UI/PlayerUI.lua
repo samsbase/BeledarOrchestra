@@ -178,6 +178,9 @@ end
 
 function ns.PressBow()
     DoEmote("BOW")
+    if ui.bowButton and ActionButton_HideOverlayGlow then
+        ActionButton_HideOverlayGlow(ui.bowButton)
+    end
 end
 
 function ns.CreatePlayerUI()
