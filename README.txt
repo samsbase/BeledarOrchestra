@@ -1,4 +1,4 @@
-﻿Beledar Orchestra v0.4.12
+﻿Beledar Orchestra v0.4.13
 ========================
 
 A World of Warcraft addon for coordinating the Hallowfall Beledar flame

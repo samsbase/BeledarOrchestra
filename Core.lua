@@ -58,16 +58,8 @@ end
 
 function ns.HasAura(unit, spellId)
     if not unit or not spellId then return false end
-
-    for i = 1, 255 do
-        local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
-        if not aura then break end
-        if type(aura) == "table" and aura.spellId == spellId then
-            return true
-        end
-    end
-
-    return false
+    local aura = C_UnitAuras.GetAuraDataBySpellID(unit, spellId, "HELPFUL")
+    return aura ~= nil
 end
 
 function ns.MakeMovable(f)

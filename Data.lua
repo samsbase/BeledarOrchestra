@@ -201,12 +201,13 @@ function ns.BuildObservedCounts()
     local observed = {}
     local anyAura = false
 
-    for i = 1, 255 do
-        local aura = C_UnitAuras.GetAuraDataByIndex("target", i, "HELPFUL")
-        if not aura then break end
-        if type(aura) == "table" and aura.spellId then
-            anyAura = true
-            observed[aura.spellId] = aura.applications or 1
+    for _, emote in pairs(ns.EMOTES) do
+        if emote.spellId then
+            local aura = C_UnitAuras.GetAuraDataBySpellID("target", emote.spellId, "HELPFUL")
+            if aura then
+                anyAura = true
+                observed[emote.spellId] = (aura.applications or 0) > 0 and aura.applications or 1
+            end
         end
     end
 
