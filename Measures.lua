@@ -4,7 +4,7 @@ ns.MEASURES = {
     [1] = {
         [1] = "VIOLIN", [2] = "CONGRATS", [3] = "VIOLIN", [4] = "ROAR", [5] = "CONGRATS", [6] = "APPLAUD", [7] = "SING", [8] = "CHEER", [9] = "ROAR", [10] = "DANCE", 
         [11] = "SING", [12] = "CONGRATS", [13] = "ROAR", [14] = "CHEER", [15] = "SING", [16] = "DANCE", [17] = "DANCE", [18] = "CHEER", [19] = "APPLAUD", [20] = "SING", 
-        [21] = "APPLAUD", [22] = "DANCE", [23] = "VIOLIN", [24] = "DANCE", [25] = "VIOLIN", [26] = "DANCE", [27] = "SING", [28] = "DANCE", [29] = "DANCE", [30] = "DANCE", 
+        [21] = "APPLAUD", [22] = "DANCE", [23] = "VIOLIN", [24] = "DANCE", [25] = "VIOLIN", [26] = "DANCE", [27] = "SING", [28] = "CHEER", [29] = "CHEER", [30] = "CHEER", 
         [31] = "DANCE", [32] = "APPLAUD", [33] = "ROAR", [34] = "SING", [35] = "APPLAUD", [36] = "SING", [37] = "CHEER", [38] = "DANCE", [39] = "CHEER", [40] = "VIOLIN"
     },
     [2] = {
@@ -51,8 +51,8 @@ ns.MEASURES = {
     },
     [9] = {
         [1] = "DANCE", [2] = "APPLAUD", [3] = "CONGRATS", [4] = "ROAR", [5] = "VIOLIN", [6] = "APPLAUD", [7] = "DANCE", [8] = "PLACEHOLDER", [9] = "ROAR", [10] = "SING", 
-        [11] = "APPLAUD", [12] = "DANCE", [13] = "CONGRATS", [14] = "ROAR", [15] = "CHEER", [16] = "PLACEHOLDER", [17] = "CHEER", [18] = "APPLAUD", [19] = "SING", [20] = "ROAR", 
-        [21] = "SING", [22] = "SING", [23] = "CONGRATS", [24] = "CHEER", [25] = "SING", [26] = "APPLAUD", [27] = "SING", [28] = "SING", [29] = "PLACEHOLDER", [30] = "DANCE", 
+        [11] = "APPLAUD", [12] = "DANCE", [13] = "CONGRATS", [14] = "ROAR", [15] = "CHEER", [16] = "DANCE", [17] = "CHEER", [18] = "APPLAUD", [19] = "SING", [20] = "ROAR", 
+        [21] = "SING", [22] = "SING", [23] = "CONGRATS", [24] = "CHEER", [25] = "SING", [26] = "APPLAUD", [27] = "SING", [28] = "SING", [29] = "ROAR", [30] = "DANCE", 
         [31] = "CONGRATS", [32] = "ROAR", [33] = "CONGRATS", [34] = "DANCE", [35] = "CONGRATS", [36] = "ROAR", [37] = "SING", [38] = "CHEER", [39] = "CONGRATS", [40] = "APPLAUD"
     },
     [10] = {
