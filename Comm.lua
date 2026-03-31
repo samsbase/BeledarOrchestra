@@ -120,6 +120,12 @@ function ns.HandleAddonMessage(message, sender)
         if m == state.currentMeasure then
             state.countdownEndTime = GetTime() + dur
             state.measureStarted = false
+            state.measureLocked = false
+            state.performedEmotes = {}
+            state.danceMoving = {}
+            state.danceComplete = {}
+            ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+            ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
             ns.UpdatePlayerPanel()
             ns.UpdateAssignmentGrid()
         end

@@ -1,118 +1,55 @@
-﻿Beledar Orchestra v0.4.15
-========================
+﻿Beledar Orchestra
+================
 
-A World of Warcraft addon for coordinating the Hallowfall Beledar flame
-puzzle event with a full raid of 40 players.
+**Beledar Orchestra** is a specialized coordination tool for World of Warcraft raids tackling the Hallowfall flame puzzle. It helps 40 players synchronize their emotes to successfully complete the event.
 
-Install
--------
-1. Unzip the BeledarOrchestra folder into:
-   World of Warcraft\_retail_\Interface\AddOns\
-2. Restart WoW or /reload.
-3. Enable the addon on the character select screen if needed.
-
-Features
+Overview
 --------
-General:
-- Addon only loads/shows when in Hallowfall (Zone ID 2215) and not in combat.
-- Auto-show/hide panels when entering/leaving the zone.
-- Leader UI opens automatically for leaders/assists when targeting the Divine
-  Flame of Beledar.
-- Robust private aura handling using HasAnySecretValues and pcall.
+The Divine Flame of Beledar in Hallowfall requires precise coordination from a full 40-man raid. This addon assigns one of 40 specific roles to every raid member, tracks their readiness, and validates the results in real-time.
 
-Leader / Assist Panel ("Beledar Orchestra Conductor"):
-- 5x5 measure selection grid (25 measures, 40 raid slots each).
-- Traffic-light indicator: green when auras match, red on mismatch, yellow
-  when no measure is selected or the target is wrong.
-- "Start" button initiates a countdown (default 10s, configurable) before
-  player emote buttons activate.
-- "Countdown 5s" button for a quick 5-second countdown.
-- "Retry" button resets the measure state and cancels any active in-game
-  countdowns (/cd 0).
-- "Lock in (Bow)" button for the leader/assist (glows when all auras match).
+Key Features
+------------
+- **Automatic Assignments**: Instantly gives every raid member a specific emote based on their position in the raid roster.
+- **Live Synchronization**: Leader selections and player progress are synced across the entire raid automatically.
+- **Validation System**: A "Traffic Light" indicator tells the leader exactly when the raid has performed the correct combination of emotes on the target.
+- **Raid Overview**: Leaders can see a full grid of the raid, highlighting who is ready, who is offline, and who has completed their task.
+- **Countdown Integration**: Built-in timers ensure everyone acts at the exact same moment.
+- **Version Check**: Easily verify that everyone in the raid has the addon installed and up to date.
+- **Multi-Language Support**: Works on all WoW client languages.
 
-Assignment Management:
-- Assigned Emotes grid (8 columns x 5 rows, matching WoW raid frames)
-  showing each player's emote icon, name, and raid slot number.
-- Manually overridden assignments highlighted with a thick gold border
-  and tinted background.
-- Player names turn red if offline or missing the required aura
-  (Spell ID 1266536), and green when they perform their emote.
-- Click any slot to change a player's emote via a dropdown menu.
-- Save / Load / Clear Manual Assigns buttons (per-measure named sets).
-- Export / Import all saved sets across all measures as a compact string.
-- Delete saved sets from the Load menu.
+How It Works
+------------
 
-Version Checking:
-- "Check Versions" button (inside the Versions panel) pings all raid
-  members and displays a color-coded grid:
-  green = current version, yellow = outdated, red = missing addon.
-- Toggle between Assignments and Versions views.
+### As a Raid Participant
+- **Stay Informed**: The **Beledar Assignment** window shows your assigned emote and raid slot.
+- **Follow the Lead**: When the leader initiates a countdown, your window will update.
+- **Action**: Once the timer hits zero, perform your emote. If you have the "Dance" assignment, the addon will help you track when to start and stop moving.
+- **Leader Overrides**: If the leader manually changes your assignment, your UI will update immediately to reflect the change.
 
-Player Panel ("Beledar Assignment"):
-- Shows the player's raid slot, current measure, and assigned emote.
-- Displays the addon version in the top-left corner.
-- Emote button stays disabled and shows "(waiting)" until the leader
-  presses Start and the countdown completes.
-- After pressing Dance, the button changes to "Move!" then "Stop Moving!"
-  tracking PLAYER_STARTED_MOVING / PLAYER_STOPPED_MOVING events.
-- Displays "(Modified by leader)" when the assignment has been manually
-  overridden.
-- After performing the emote, all buttons grey out until the leader
-  selects a new measure or presses Retry.
-
-Data Sync:
-- Automatic lightweight measure-data sync (BO_DATASYNC protocol).
-  Newer clients broadcast the full 25x40 measures table to older clients
-  in the raid, keeping everyone up to date without manual intervention.
-
-Communication:
-- All coordination uses addon messages on the RAID channel:
-  measure selection, overrides, start/retry, ping/pong, performed emotes,
-  dance state, clear overrides, and data sync chunks.
-
-Locale-Independent:
-- Target identification uses NPC ID 255888 instead of the English name,
-  so the addon works in all WoW client languages.
+### As a Leader or Assistant
+- **The Conductor Panel**: This is your command center. Open it by targeting the Divine Flame or typing `/conductor`.
+- **Choose a Measure**: Select from 25 pre-set emote combinations (measures).
+- **Coordinate**: Use the **Start** button to trigger a 10-second countdown for all addon users in the raid.
+- **Monitor**: Watch the assignments grid to see players turn green as they complete their emotes.
+- **Manual Overrides**: Click any player in the grid to manually change their assigned emote if needed.
+- **Save/Load/Export**: Save custom assignment sets for specific measures or export them as a string to share with other leaders.
+- **Validation**: Target the Divine Flame to see the status light. It turns **Green** when the current emotes on the flame match your selected measure.
 
 Slash Commands
 --------------
-/conductor             - toggle the main panel
-/conductor show        - show the main panel
-/conductor hide        - hide the main panel
-/conductor measure 7   - set the active measure to 7 (leader only)
-/conductor reset       - clear the active measure
+- `/conductor` — Toggle the main Conductor panel.
+- `/conductor show` / `/conductor hide` — Show or hide the assignment window.
+- `/conductor measure [number]` — Set the active measure (Leader only).
+- `/conductor reset` — Clear the current active measure.
 
-How Validation Works
---------------------
-- The addon scans helpful auras on your current target (NPC ID 255888).
-- It builds observed counts by spell ID.
-- It compares those counts against the expected counts for the selected
-  measure.
-- PLACEHOLDER slots are ignored.
-- Green = exact match, Red = mismatch, Yellow = waiting / wrong target.
+Installation
+------------
+1. Download and extract the `BeledarOrchestra` folder.
+2. Place it in your `World of Warcraft\_retail_\Interface\AddOns\` directory.
+3. Ensure the addon is enabled in your character select screen.
 
-Supported Emotes
-----------------
-APPLAUD, BOW, CHEER, CONGRATS, DANCE, ROAR, SING, VIOLIN
-(PLACEHOLDER is used for unassigned slots and is ignored by validation.)
-
-File Structure
---------------
-Measures.lua       - 25x40 emote assignment table
-Core.lua           - constants, shared state, utility functions
-Data.lua           - emote definitions, encoding helpers, data access
-Comm.lua           - addon message handling (send/receive)
-UI\PlayerUI.lua    - player assignment frame
-UI\LeaderUI.lua    - leader/assist UI, grids, dialogs
-DataSync.lua       - automatic measure-data synchronisation
-Init.lua           - event handlers, slash commands, OnUpdate loop
-
-Notes
------
-- Raid slot assignment is live based on WoW's raid roster order.
-  If the raid order changes, assignments change too.
-- Saved assignment sets are stored per-character in BeledarOrchestraDB.
-- The addon requires the leader/assist to have the addon installed to
-  coordinate measures. Raid members need the addon to see their
-  assignments and perform emotes.
+Important Notes
+---------------
+- **Raid Order**: Assignments are based on the current raid roster order. If the leader rearranges groups, assignments may shift.
+- **Addon Requirements**: While the leader needs the addon to coordinate, raid members also need it installed to see their assignments and participate in the automated countdowns.
+- **Automatic Show/Hide**: The interface is designed to automatically appear when you are in Hallowfall and disappear when you leave or enter combat.

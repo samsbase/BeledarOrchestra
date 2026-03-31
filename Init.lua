@@ -103,6 +103,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
 
         BeledarOrchestraDB.Overrides = BeledarOrchestraDB.Overrides or {}
         BeledarOrchestraDB.SavedSets = BeledarOrchestraDB.SavedSets or {}
+        state.lastCompletedMeasure = BeledarOrchestraDB.LastCompletedMeasure
 
         -- Migration from flat SavedSets to measure-based SavedSets
         local needsMigration = false

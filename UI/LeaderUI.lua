@@ -33,6 +33,14 @@ function ns.SetStatus(status, text, entries)
     state.mismatchText = text or ""
     state.lastEntries = entries
 
+    if status == "GREEN" and state.currentMeasure then
+        state.lastCompletedMeasure = state.currentMeasure
+        BeledarOrchestraDB.LastCompletedMeasure = state.currentMeasure
+        if ui.lastMeasureText then
+            ui.lastMeasureText:SetText("Last Completed: " .. tostring(state.lastCompletedMeasure))
+        end
+    end
+
     if ui.light and ui.light.texture then
         if status == "GREEN" then
             ui.light.texture:SetColorTexture(0, 0.85, 0, 1)
@@ -690,6 +698,11 @@ function ns.CreateLeaderUI()
     measureLabel:SetText("No measure")
     ui.measureLabel = measureLabel
 
+    local lastMeasureText = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    lastMeasureText:SetPoint("TOPLEFT", measureLabel, "BOTTOMLEFT", 0, -2)
+    lastMeasureText:SetText("Last Completed: " .. (state.lastCompletedMeasure or "None"))
+    ui.lastMeasureText = lastMeasureText
+
     local light = CreateFrame("Frame", nil, main)
     light:SetSize(36, 36)
     light:SetPoint("TOPRIGHT", -22, -22)
@@ -1086,6 +1099,13 @@ function ns.CreateLeaderUI()
         local dur = state.countdownDuration
         state.countdownEndTime = GetTime() + dur
         state.measureStarted = false
+        state.measureLocked = false
+        state.performedEmotes = {}
+        state.danceMoving = {}
+        state.danceComplete = {}
+        ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+        ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
+
         C_PartyInfo.DoCountdown(dur)
         if IsInGroup() then
             local channel = IsInRaid() and "RAID" or "PARTY"
@@ -1122,6 +1142,13 @@ function ns.CreateLeaderUI()
         local dur = 5
         state.countdownEndTime = GetTime() + dur
         state.measureStarted = false
+        state.measureLocked = false
+        state.performedEmotes = {}
+        state.danceMoving = {}
+        state.danceComplete = {}
+        ns.frame:UnregisterEvent("PLAYER_STARTED_MOVING")
+        ns.frame:UnregisterEvent("PLAYER_STOPPED_MOVING")
+
         C_PartyInfo.DoCountdown(dur)
         if state.currentMeasure and IsInGroup() then
             local channel = IsInRaid() and "RAID" or "PARTY"

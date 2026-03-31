@@ -29,6 +29,7 @@ ns.state = {
     measureStarted = false,
     countdownEndTime = nil,
     countdownDuration = 10,
+    lastCompletedMeasure = nil,
 }
 
 -- Shared UI table
