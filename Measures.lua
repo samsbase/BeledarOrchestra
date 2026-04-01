@@ -50,7 +50,7 @@ ns.MEASURES = {
         [31] = "SING", [32] = "SING", [33] = "ROAR", [34] = "SING", [35] = "CHEER", [36] = "CHEER", [37] = "SING", [38] = "SING", [39] = "CHEER", [40] = "VIOLIN"
     },
     [9] = {
-        [1] = "DANCE", [2] = "APPLAUD", [3] = "CONGRATS", [4] = "ROAR", [5] = "VIOLIN", [6] = "APPLAUD", [7] = "DANCE", [8] = "PLACEHOLDER", [9] = "ROAR", [10] = "SING", 
+        [1] = "DANCE", [2] = "APPLAUD", [3] = "CONGRATS", [4] = "ROAR", [5] = "VIOLIN", [6] = "APPLAUD", [7] = "DANCE", [8] = "DANCE", [9] = "ROAR", [10] = "SING", 
         [11] = "APPLAUD", [12] = "DANCE", [13] = "CONGRATS", [14] = "ROAR", [15] = "CHEER", [16] = "DANCE", [17] = "CHEER", [18] = "APPLAUD", [19] = "SING", [20] = "ROAR", 
         [21] = "SING", [22] = "SING", [23] = "CONGRATS", [24] = "CHEER", [25] = "SING", [26] = "APPLAUD", [27] = "SING", [28] = "SING", [29] = "ROAR", [30] = "DANCE", 
         [31] = "CONGRATS", [32] = "ROAR", [33] = "CONGRATS", [34] = "DANCE", [35] = "CONGRATS", [36] = "ROAR", [37] = "SING", [38] = "CHEER", [39] = "CONGRATS", [40] = "APPLAUD"
@@ -95,7 +95,7 @@ ns.MEASURES = {
         [1] = "CONGRATS", [2] = "ROAR", [3] = "ROAR", [4] = "DANCE", [5] = "VIOLIN", [6] = "CHEER", [7] = "SING", [8] = "ROAR", [9] = "SING", [10] = "DANCE", 
         [11] = "DANCE", [12] = "APPLAUD", [13] = "CHEER", [14] = "DANCE", [15] = "CHEER", [16] = "CHEER", [17] = "SING", [18] = "CHEER", [19] = "APPLAUD", [20] = "VIOLIN", 
         [21] = "CHEER", [22] = "SING", [23] = "APPLAUD", [24] = "DANCE", [25] = "CHEER", [26] = "ROAR", [27] = "APPLAUD", [28] = "VIOLIN", [29] = "SING", [30] = "SING", 
-        [31] = "VIOLIN", [32] = "ROAR", [33] = "CONGRATS", [34] = "DANCE", [35] = "DANCE", [36] = "CHEER", [37] = "DANCE", [38] = "APPLAUD", [39] = "CHEER", [40] = "APPLAUD"
+        [31] = "VIOLIN", [32] = "ROAR", [33] = "CONGRATS", [34] = "DANCE", [35] = "CHEER", [36] = "CHEER", [37] = "DANCE", [38] = "APPLAUD", [39] = "CHEER", [40] = "APPLAUD"
     },
     [17] = {
         [1] = "SING", [2] = "DANCE", [3] = "CHEER", [4] = "CHEER", [5] = "CHEER", [6] = "DANCE", [7] = "VIOLIN", [8] = "ROAR", [9] = "APPLAUD", [10] = "SING", 
