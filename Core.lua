@@ -45,8 +45,24 @@ end
 
 function ns.GetNpcID(unit)
     local id = UnitCreatureID(unit)
-    if id then return tonumber(id) end
+    -- Secret while unit identity is restricted (12.0+); comparing it would error.
+    if id and not issecretvalue(id) then return tonumber(id) end
     return nil
+end
+
+-- DoEmote is only a deprecation fallback since 12.0 (absent when loadDeprecationFallbacks is off).
+function ns.DoEmote(command)
+    return C_ChatInfo.PerformEmote(command)
+end
+
+-- ActionButton_Show/HideOverlayGlow were removed; the alert manager works on any frame.
+function ns.SetButtonGlow(button, on)
+    if not button then return end
+    if on then
+        ActionButtonSpellAlertManager:ShowAlert(button)
+    else
+        ActionButtonSpellAlertManager:HideAlert(button)
+    end
 end
 
 function ns.IsTargetNpc(unit)
@@ -65,18 +81,9 @@ function ns.GetAuraData(unit, spellId, filter)
         if not aura then break end
 
         local auraSpellId = aura.spellId
-        if auraSpellId then
-            -- Use HasAnySecretValues if available (WoW 11.0.5+) to avoid crashes when 
-            -- comparing "secret number values" (private auras) to a regular number.
-            local isSecret = HasAnySecretValues and HasAnySecretValues(auraSpellId)
-            if not isSecret then
-                -- Still use pcall for absolute safety against comparison errors 
-                -- in all client versions.
-                local success, match = pcall(function() return auraSpellId == spellId end)
-                if success and match then
-                    return aura
-                end
-            end
+        -- Secret while aura access is restricted (12.0+); comparing it would error.
+        if auraSpellId and not issecretvalue(auraSpellId) and auraSpellId == spellId then
+            return aura
         end
     end
     return nil

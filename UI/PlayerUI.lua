@@ -160,7 +160,7 @@ function ns.PressPlayerEmote()
         return
     end
 
-    DoEmote(emote.command)
+    ns.DoEmote(emote.command)
     state.measureLocked = true
 
     if IsInGroup() then
@@ -177,10 +177,8 @@ function ns.PressPlayerEmote()
 end
 
 function ns.PressBow()
-    DoEmote("BOW")
-    if ui.bowButton and ActionButton_HideOverlayGlow then
-        ActionButton_HideOverlayGlow(ui.bowButton)
-    end
+    ns.DoEmote("BOW")
+    ns.SetButtonGlow(ui.bowButton, false)
 end
 
 function ns.CreatePlayerUI()

@@ -55,13 +55,7 @@ function ns.SetStatus(status, text, entries)
         ui.statusText:SetText(text or "")
     end
 
-    if ui.bowButton and ActionButton_ShowOverlayGlow then
-        if status == "GREEN" then
-            ActionButton_ShowOverlayGlow(ui.bowButton)
-        else
-            ActionButton_HideOverlayGlow(ui.bowButton)
-        end
-    end
+    ns.SetButtonGlow(ui.bowButton, status == "GREEN")
 
     ns.RenderMismatchEntries(entries or {})
 end
@@ -830,13 +824,7 @@ function ns.CreateLeaderUI()
             end
             if ui.bowButton then
                 ui.bowButton:Show()
-                if ActionButton_ShowOverlayGlow then
-                    if state.status == "GREEN" then
-                        ActionButton_ShowOverlayGlow(ui.bowButton)
-                    else
-                        ActionButton_HideOverlayGlow(ui.bowButton)
-                    end
-                end
+                ns.SetButtonGlow(ui.bowButton, state.status == "GREEN")
             end
             if ui.startButton then ui.startButton:Show() end
             if ui.retryButton then ui.retryButton:Show() end
@@ -847,9 +835,7 @@ function ns.CreateLeaderUI()
             end
             if ui.bowButton then
                 ui.bowButton:Hide()
-                if ActionButton_HideOverlayGlow then
-                    ActionButton_HideOverlayGlow(ui.bowButton)
-                end
+                ns.SetButtonGlow(ui.bowButton, false)
             end
             if ui.startButton then ui.startButton:Hide() end
             if ui.retryButton then ui.retryButton:Hide() end
